@@ -163,6 +163,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: artifacts/**
+          # Publish only final deliverables; drop build intermediates (vscode.tar.gz).
+          files: |
+            artifacts/picket-code-*
+            artifacts/SHA256SUMS
           prerelease: ${{ github.event.inputs.pre_release == 'true' }}
           generate_release_notes: true
