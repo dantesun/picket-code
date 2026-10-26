@@ -1,0 +1,13 @@
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -231,5 +231,9 @@
+ 				'**/file-uri-to-path/**',
+ 				'**/node-gyp-build/**',
++				// spdlog / windows-registry: native modules loaded at startup via
++				// dynamic require on Windows (same internal-resolution issue).
++				'**/@vscode/spdlog/**',
++				'**/@vscode/windows-registry/**',
+ 				// The Dev Container CLI is spawned as an external Node process,
+ 				// so its bundled entrypoint must be available outside the ASAR.
+ 				'**/@devcontainers/cli/**',

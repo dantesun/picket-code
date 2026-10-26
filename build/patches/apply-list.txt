@@ -11,3 +11,4 @@
 54-picket-code-disable-node-compile-cache.patch
 55-picket-unpack-policy-watcher.patch
 56-picket-unpack-loader-chain.patch
+57-picket-unpack-spdlog-registry.patch
