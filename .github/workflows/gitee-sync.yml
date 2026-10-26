@@ -21,6 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Sync repo to Gitee (main + tags)
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add gitee "https://dsun:${GITEE_TOKEN}@gitee.com/dsun/picket-code.git"
+          git push gitee main
+          git push gitee --tags
 
       - name: Download GitHub release assets
         uses: robinraju/release-downloader@v1
