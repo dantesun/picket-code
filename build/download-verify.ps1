@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Picket Code 自动下载 + 合并 + SHA256 校验（Windows PowerShell 版）
 .DESCRIPTION
@@ -60,7 +60,7 @@ $mergePath = Join-Path $OutDir "MERGE.txt"
 & curl.exe -fsSL --retry 3 -o $mergePath "$prefix/MERGE.txt" 2>$null
 if ($LASTEXITCODE -ne 0) { throw "下载 MERGE.txt 失败" }
 $expected = $null
-foreach ($line in Get-Content $mergePath) {
+foreach ($line in Get-Content $mergePath -Encoding UTF8) {
   if ($line -match ("合并后校验值.*" + [regex]::Escape($base) + " = ([0-9a-f]+)")) { $expected = $Matches[1] }
 }
 if (-not $expected) { throw "MERGE.txt 中未找到 $base 的合并后校验值" }
