@@ -4,7 +4,7 @@ name: Gitee Sync
 # 也可手动运行（workflow_dispatch）补齐历史版本。
 on:
   release:
-    types: [published]
+    types: [published, created]
   workflow_dispatch:
     inputs:
       tag:
