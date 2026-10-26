@@ -50,7 +50,7 @@ jobs:
               -d "access_token=${GITEE_TOKEN}" \
               -d "tag_name=${TAG}" \
               -d "name=${TAG}" \
-              -d "body=Picket Code 发行版（GitHub Release 自动同步，含分卷段，见 MERGE.txt）" \
+              --data-urlencode "body@dist/MERGE.txt" \
               -d "prerelease=false" \
               -d "target_commitish=main") || { echo "CREATE FAILED"; exit 1; }
           fi
