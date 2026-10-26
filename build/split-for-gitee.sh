@@ -15,30 +15,31 @@ cat > MERGE_TMP.txt <<'EOF'
 【分卷合并说明】
 
 本发行版的大体积文件已按 Gitee 附件限制（单文件 100M）拆分为多个 .part 段。
-请下载全部段后按以下步骤还原：
+请下载全部段到同一目录后，按以下步骤还原（PowerShell 或 cmd 任选其一）。
 
-一、Windows（PowerShell 或 cmd 均可）
+一、PowerShell（推荐）
 
-  假设拆分的是 picket-code-win32-x64.zip，段为：
-    picket-code-win32-x64.zip.00.part
-    picket-code-win32-x64.zip.01.part
-    picket-code-win32-x64.zip.02.part
+  在下载目录打开 PowerShell，执行（命令用 $PWD 定位目标文件，不会出现路径解析错误）：
 
-  cmd 合并（按文件名顺序，务必按 00、01、02 排列）：
-    copy /b picket-code-win32-x64.zip.00.part + picket-code-win32-x64.zip.01.part + picket-code-win32-x64.zip.02.part picket-code-win32-x64.zip
+    Get-ChildItem "picket-code-win32-x64.zip.*.part" | Sort-Object Name | ForEach-Object { [System.IO.File]::AppendAllBytes((Join-Path $PWD 'picket-code-win32-x64.zip'), [System.IO.File]::ReadAllBytes($_.FullName)) }
 
-  PowerShell 合并（推荐，自动按序）：
-    Get-ChildItem "picket-code-win32-x64.zip.*.part" | Sort-Object Name | ForEach-Object { [System.IO.File]::AppendAllBytes("picket-code-win32-x64.zip", [System.IO.File]::ReadAllBytes($_.FullName)) }
+  若仍报路径错误，将命令中的文件名改为完整路径，例如：
+    Get-ChildItem "D:\Downloads\picket-code-win32-x64.zip.*.part" | Sort-Object Name | ForEach-Object { [System.IO.File]::AppendAllBytes("D:\Downloads\picket-code-win32-x64.zip", [System.IO.File]::ReadAllBytes($_.FullName)) }
 
-二、Linux / macOS
+二、cmd（需先在下载目录执行 cd /d）
+
+  cd /d D:\Downloads
+  copy /b picket-code-win32-x64.zip.00.part + picket-code-win32-x64.zip.01.part + picket-code-win32-x64.zip.02.part picket-code-win32-x64.zip
+
+三、Linux / macOS
     cat picket-code-win32-x64.zip.00.part picket-code-win32-x64.zip.01.part picket-code-win32-x64.zip.02.part > picket-code-win32-x64.zip
 
-三、校验（必须执行）
+四、校验（必须执行）
     Windows: certutil -hashfile picket-code-win32-x64.zip SHA256
     Linux:   sha256sum picket-code-win32-x64.zip
     将输出与本说明末尾【合并后校验值】比对，一致即合并成功。
 
-四、解压使用：还原出的 zip/tar.gz 与 GitHub Release 原始资产完全一致。
+五、解压使用：还原出的 zip/tar.gz 与 GitHub Release 原始资产完全一致。
 EOF
 
 # 拆分大于上限的文件，记录原文件校验值
