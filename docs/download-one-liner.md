@@ -1,39 +1,64 @@
 # Picket Code 一键下载安装命令
 
-单条命令完成全部流程：**下载分卷段 → 合并 → SHA256 校验 → 解压**。无需下载脚本文件，直接复制运行。
+一条命令完成全部流程：**拉取最新下载脚本 → 下载分卷段（显式进度/失败重试/断点续传）→ 合并 → SHA256 校验 → 解压**。
 
-> 当前默认版本：**v1.143.1-p2**。换版本时按文末【换版本】修改 `T` 与校验值 `e`。
-> Windows 命令外层用**单引号**包裹，避免在 PowerShell 窗口粘贴时被当前会话做变量插值。
+> 当前默认版本：**v1.143.1-p2**。
+> 脚本自带：显式进度（curl 进度条 / 百分比）、失败自动重试 5 次、断点续传（服务器支持 Range 时）。
+> Gitee release 附件不支持 Range，脚本会自动探测并降级为全量下载（不会报错中断）。
 
 ---
 
-## Windows（PowerShell / cmd 通用单行）
+## Windows（PowerShell 单行，自动走系统代理）
 
-直接粘贴运行，在**当前目录**完成下载、合并、校验、解压：
+在目标目录（如 `D:\Downloads`）直接粘贴运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command '$t="v1.143.1-p2";$b="picket-code-win32-x64.zip";$u="https://gitee.com/dsun/picket-code/releases/download/"+$t;$alt="https://github.com/dantesun/picket-code/releases/download/"+$t;$n=0;$wc=New-Object System.Net.WebClient;while($true){$s="{0:D2}"-f $n;$f=$b+"."+$s+".part";$ok=$false;try{$wc.DownloadFile(($u+"/"+$f),(Join-Path $PWD $f));$ok=$true}catch{try{$wc.DownloadFile(($alt+"/"+$f),(Join-Path $PWD $f));$ok=$true}catch{}};if(-not $ok){if($n -eq 0){throw "download failed"};break};$n++};if($n -eq 0){throw "no segments"};$segs=Get-ChildItem ($b+".*.part")|Sort-Object Name;$o=(Join-Path $PWD $b);[IO.File]::WriteAllBytes($o,[IO.File]::ReadAllBytes($segs[0].FullName));if($segs.Count -gt 1){$segs[1..($segs.Count-1)]|%{[IO.File]::AppendAllBytes($o,[IO.File]::ReadAllBytes($_.FullName))}};$h=(Get-FileHash -Algorithm SHA256 $o).Hash.ToLower();$e="52c959632597f15125b2c96e99b4a45b0b03d227b1a8f5cd609580fba7c4bac0";if($h -ne $e){Write-Host ("SHA256 MISMATCH: "+$h);exit 1};Write-Host ("OK: "+$o);Expand-Archive -Force -Path $o -DestinationPath $PWD;Write-Host ("Extracted to: "+$PWD)'
+powershell -NoProfile -ExecutionPolicy Bypass -Command '$f=(Join-Path $PWD "download-verify.ps1");$wc=New-Object System.Net.WebClient;$u1="https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.ps1";$u2="https://gitee.com/dsun/picket-code/raw/main/build/download-verify.ps1";try{$wc.DownloadFile($u1,$f)}catch{$wc.DownloadFile($u2,$f)};& $f -Tag v1.143.1-p2'
 ```
 
-完成后程序位置：`<当前目录>\picket-code-win32-x64\Picket Code.exe`
+- 脚本优先从 GitHub raw 拉取（避免 Gitee CDN 缓存旧版），失败自动改用 Gitee raw。
+- WebClient 自动使用系统代理，企业网络可直接下载。
+- 完成后程序位置：`<当前目录>\picket-code-win32-x64\Picket Code.exe`
+
+**已下载过脚本、只想重新运行**：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v1.143.1-p2
+```
 
 ---
 
 ## Linux / macOS（bash 单行）
 
 ```bash
-T=v1.143.1-p2; B=picket-code-linux-x64.tar.gz; U=https://gitee.com/dsun/picket-code/releases/download/$T; n=0; while :; do s=$(printf "%02d" $n); f=$B.$s.part; if ! curl -fsSL --retry 3 -o "$f" "$U/$f" 2>/dev/null; then [ $n -eq 0 ] && { echo "download failed"; exit 1; }; rm -f "$f"; break; fi; n=$((n+1)); done; cat $B.??.part > $B; h=$(sha256sum $B|cut -d" " -f1); e=b4a4d7a564fba131d6da6025e74b3fdbf6410114cb480763960075bed9bde5c6; [ "$h" != "$e" ] && { echo "SHA256 MISMATCH: $h"; exit 1; }; echo "OK: $B"; mkdir -p picket-code && tar -xzf $B -C picket-code && echo "Extracted: picket-code/picket-code-linux-x64/bin/picket-code"
+curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.sh" -o dv.sh && bash dv.sh v1.143.1-p2
 ```
 
-完成后程序位置：`picket-code/picket-code-linux-x64/bin/picket-code`
+国内访问 GitHub 慢时改用 Gitee 源拉脚本：
+
+```bash
+curl -fSL "https://gitee.com/dsun/picket-code/raw/main/build/download-verify.sh" -o dv.sh && bash dv.sh v1.143.1-p2
+```
+
+完成后程序位置：解压后目录下的 `bin/picket-code`。
+
+---
+
+## 脚本参数
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| Tag | v1.143.1-p2 | 版本号，如 `v1.143.1-p3` |
+| Source | gitee | `gitee` 或 `github`（GitHub 源支持断点续传） |
+
+示例：`bash dv.sh v1.143.1-p2 github`
 
 ---
 
 ## 换版本
 
-1. 修改版本号（Windows：`$t=` 后；Linux：`T=` 后）
-2. 修改校验值 `e` 为新版本的合并后 SHA256（见该版本 Release 描述【合并后校验值】）
-3. 平台与架构不变则文件名变量（`$b` / `B`）不用改
+1. 修改命令/脚本中的版本号（`-Tag` / 第一个参数）
+2. 校验值自动从该版本 Release 的 MERGE.txt 读取，无需手工改
 
 ## 校验值参考（v1.143.1-p2）
 

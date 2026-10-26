@@ -25,7 +25,12 @@ set "i=0"
 :download
 if %i% LSS 10 (set "segnum=0%i%") else (set "segnum=%i%")
 set "SEG=%BASE%.%segnum%.part"
-curl -fSL --retry 3 -o "%SEG%" "%HOST%/releases/download/%TAG%/%SEG%" >nul 2>&1
+REM resume (-C -) + retry 5x + progress bar; fallback to full download if server rejects Range
+curl -fL -C - --retry 5 --retry-delay 2 --progress-bar -o "%SEG%" "%HOST%/releases/download/%TAG%/%SEG%"
+if errorlevel 1 (
+  del "%SEG%" >nul 2>&1
+  curl -fL --retry 5 --retry-delay 2 --progress-bar -o "%SEG%" "%HOST%/releases/download/%TAG%/%SEG%"
+)
 if errorlevel 1 (
   if %i% EQU 0 ( echo first segment download failed: %SEG% & exit /b 1 )
   del "%SEG%" >nul 2>&1
