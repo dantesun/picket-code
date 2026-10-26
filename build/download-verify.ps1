@@ -17,9 +17,10 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
-# 检测平台与架构
-$os = if ($IsWindows) { "win32" } elseif ($IsLinux) { "linux" } elseif ($IsMacOS) { "darwin" } else { "linux" }
-$mach = if ($IsWindows) { $env:PROCESSOR_ARCHITECTURE } else { (uname -m) }
+# 检测平台与架构（兼容 Windows PowerShell 5.1：无 $IsWindows 自动变量）
+$win = $env:OS -eq "Windows_NT"
+$os = if ($win) { "win32" } elseif ($IsLinux) { "linux" } elseif ($IsMacOS) { "darwin" } else { "linux" }
+$mach = if ($win) { $env:PROCESSOR_ARCHITECTURE } elseif ($IsLinux -or $IsMacOS) { (uname -m) } else { "x86_64" }
 $arch = if ($mach -match "ARM|aarch64") { "arm64" } else { "x64" }
 $ext = if ($os -eq "win32") { "zip" } else { "tar.gz" }
 $base = "picket-code-$os-$arch.$ext"
