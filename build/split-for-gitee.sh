@@ -14,10 +14,15 @@ rm -f MERGE.txt MERGE_TMP.txt
 cat > MERGE_TMP.txt <<'EOF'
 【分卷合并说明】
 
-本发行版的大体积文件已按 Gitee 附件限制（单文件 100M）拆分为多个 .part 段。
-请下载全部段到同一目录后，按以下步骤还原（PowerShell 或 cmd 任选其一）。
+〇、自动下载安装（推荐，无需手动合并）
+    下载并运行仓库中的自动脚本，将自动完成 下载分卷段 → 合并 → SHA256 校验：
+    - Windows PowerShell: https://gitee.com/dsun/picket-code/raw/main/build/download-verify.ps1
+    - Windows cmd: https://gitee.com/dsun/picket-code/raw/main/build/download-verify.bat
+    - Linux/macOS: https://gitee.com/dsun/picket-code/raw/main/build/download-verify.sh
+    或让任意 AI 助手按 https://gitee.com/dsun/picket-code/raw/main/docs/ai-download-prompt.md 自动完成。
+    校验通过即与下方手动步骤效果一致。
 
-一、PowerShell（推荐）
+一、PowerShell（手动）
 
   在下载目录打开 PowerShell，执行（命令用 $PWD 定位目标文件，不会出现路径解析错误）：
 
