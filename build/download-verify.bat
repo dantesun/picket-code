@@ -4,7 +4,7 @@ REM ============================================================
 REM  Picket Code auto download + merge + verify (Windows cmd)
 REM  Usage: download-verify.bat [TAG] [gitee|github]
 REM  Example: download-verify.bat                  (default v1.143.1-p1, gitee)
-REM           download-verify.bat v1.143.1-p2 github
+REM           download-verify.bat v1.143.1-p3 github
 REM ============================================================
 
 set "TAG=%~1"

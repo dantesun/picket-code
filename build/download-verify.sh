@@ -2,11 +2,11 @@
 # Picket Code 自动下载 + 合并 + SHA256 校验（Linux/macOS）
 # 支持：显式进度（curl 进度条 + 每段大小）、失败重试 5 次、断点续传（-C -）
 # 用法: ./download-verify.sh [TAG] [gitee|github]
-#   bash download-verify.sh                # 默认 v1.143.1-p2, gitee 源
-#   bash download-verify.sh v1.143.1-p2 github
+#   bash download-verify.sh                # 默认 v1.143.1-p3, gitee 源
+#   bash download-verify.sh v1.143.1-p3 github
 set -uo pipefail
 
-TAG="${1:-v1.143.1-p2}"
+TAG="${1:-v1.143.1-p3}"
 SOURCE="${2:-gitee}"
 
 MACH="$(uname -m)"
