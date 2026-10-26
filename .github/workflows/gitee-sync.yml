@@ -51,9 +51,10 @@ jobs:
               -d "tag_name=${TAG}" \
               -d "name=${TAG}" \
               -d "body=Picket Code 发行版（GitHub Release 自动同步，含分卷段，见 MERGE.txt）" \
-              -d "prerelease=false")
+              -d "prerelease=false" \
+              -d "target_commitish=main") || { echo "CREATE FAILED"; exit 1; }
           fi
-          ID=$(printf '%s' "$REL" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+          ID=$(printf '%s' "$REL" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])') || { echo "BAD RESPONSE: $REL"; exit 1; }
           echo ">> Gitee release id=$ID"
           # 2) 逐个上传附件（分卷段 / MERGE.txt / SHA256SUMS），已存在则跳过
           for f in dist/*; do
