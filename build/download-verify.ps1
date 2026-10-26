@@ -39,6 +39,10 @@ while ($true) {
   Write-Host "  段 $segName ..."
   & curl.exe -fsSL --retry 3 -o $segPath $url 2>$null
   if ($LASTEXITCODE -ne 0) {
+    # curl 不走系统代理时回退 WebClient（自动使用 IE/系统代理）
+    try { (New-Object System.Net.WebClient).DownloadFile($url, $segPath) } catch { $LASTEXITCODE = 1 }
+  }
+  if ($LASTEXITCODE -ne 0) {
     if ($i -eq 0) { throw "第一段下载失败: $url" }
     Remove-Item $segPath -ErrorAction SilentlyContinue
     break
