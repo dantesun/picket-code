@@ -4,17 +4,21 @@
 .DESCRIPTION
   从 Gitee/GitHub Release 自动下载全部分卷段，合并还原原始包，并与
   release 描述中的【合并后校验值】比对。
-  支持：显式进度（curl 进度条 / WebRequest 百分比）、失败重试 5 次、断点续传。
+  支持：显式进度（百分比）、失败重试 5 次、断点续传。
+  代理策略：WebRequest 自动使用系统代理 + 当前 Windows 用户凭据（解决企业代理 407）；
+  curl 作为直连环境的兜底（-C - 续传）。
 .EXAMPLE
   .\download-verify.ps1
   .\download-verify.ps1 -Tag v1.143.1-p2 -Source github
   .\download-verify.ps1 -Tag v1.143.1-p2 -OutDir D:\Downloads
+  .\download-verify.ps1 -ProxyCredential (Get-Credential)
 #>
 param(
   [string]$Tag = "v1.143.1-p2",
   [string]$Repo = "dsun/picket-code",
   [ValidateSet("gitee","github")][string]$Source = "gitee",
-  [string]$OutDir = (Get-Location).Path
+  [string]$OutDir = (Get-Location).Path,
+  [pscredential]$ProxyCredential
 )
 $ErrorActionPreference = "Stop"
 
@@ -30,19 +34,18 @@ $hostName = if ($Source -eq "github") { "github.com/dantesun/picket-code" } else
 $prefix = "https://$hostName/releases/download/$Tag"
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
 
-# 下载单个文件：curl（续传/进度）优先，失败回退 WebRequest（系统代理 + 手动续传 + 百分比）
+# 代理凭据：显式传入优先，否则用当前 Windows 用户（DefaultCredentials）
+$proxyCred = if ($ProxyCredential) { $ProxyCredential.GetNetworkCredential() } else { [System.Net.CredentialCache]::DefaultCredentials }
+
+# 下载单文件：WebRequest（系统代理 + 凭据 + 续传 + 百分比进度）优先；curl 直连兜底
 function Download-Resume {
   param([string]$Url, [string]$Path)
   for ($try = 1; $try -le 5; $try++) {
-    $existing = if (Test-Path $Path) { (Get-Item $Path).Length } else { 0 }
-    if ($existing -gt 0) { Write-Host "  已有 $([math]::Round($existing/1MB,1)) MB，断点续传..." }
-    & curl.exe -fL -C - --retry 3 --retry-delay 2 --progress-bar -o $Path $Url
-    if ($LASTEXITCODE -eq 0) { return $true }
-
-    # WebRequest：自动使用系统代理，手动断点续传（Range），进度百分比
+    # 1) WebRequest：企业代理环境主路径
     try {
       $req = [System.Net.HttpWebRequest]::Create($Url)
       $req.Proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+      $req.Proxy.Credentials = $proxyCred
       $req.UserAgent = "picket-code-downloader"
       $len = if (Test-Path $Path) { (Get-Item $Path).Length } else { 0 }
       $mode = "Create"
@@ -74,6 +77,11 @@ function Download-Resume {
     } catch {
       Write-Host "  WebRequest 失败: $($_.Exception.Message)"
     }
+    # 2) curl：直连（无代理环境）兜底，-C - 续传 + 进度条
+    $existing = if (Test-Path $Path) { (Get-Item $Path).Length } else { 0 }
+    if ($existing -gt 0) { Write-Host "  已有 $([math]::Round($existing/1MB,1)) MB，断点续传..." }
+    & curl.exe -fL -C - --retry 3 --retry-delay 2 --progress-bar -o $Path $Url
+    if ($LASTEXITCODE -eq 0) { return $true }
     if ($try -lt 5) { Write-Host "  第 $try 次失败，2 秒后重试..."; Start-Sleep -Seconds 2 }
   }
   return $false
@@ -109,7 +117,12 @@ $hash = (Get-FileHash -Algorithm SHA256 $merged).Hash.ToLower()
 $mergePath = Join-Path $OutDir "MERGE.txt"
 & curl.exe -fSL --retry 3 -o $mergePath "$prefix/MERGE.txt" 2>$null
 if ($LASTEXITCODE -ne 0) {
-  try { (New-Object System.Net.WebClient).DownloadFile("$prefix/MERGE.txt", $mergePath) } catch { throw "下载 MERGE.txt 失败" }
+  try {
+    $wc = New-Object System.Net.WebClient
+    $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+    $wc.Proxy.Credentials = $proxyCred
+    $wc.DownloadFile("$prefix/MERGE.txt", $mergePath)
+  } catch { throw "下载 MERGE.txt 失败: $($_.Exception.Message)" }
 }
 $expected = $null
 foreach ($line in Get-Content $mergePath -Encoding UTF8) {
