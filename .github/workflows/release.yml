@@ -210,10 +210,17 @@ jobs:
       RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
     steps:
-      - uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-          merge-multiple: true
+      # Take the assets from the published release rather than from the run artifacts:
+      # SHA256SUMS only exists there (it is merged inside the release job), and the
+      # pattern picks up whatever platforms the matrix produced.
+      - name: Download published assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir release \
+            --pattern 'picket-code-*' --pattern 'SHA256SUMS'
+          ls -l release
 
       - name: Install rclone
         run: |
@@ -222,12 +229,7 @@ jobs:
           rclone version
 
       - name: Sync release artifacts to R2 (keep latest only)
-        run: |
-          mkdir -p release
-          cp artifacts/picket-code-win32-x64.zip release/
-          cp artifacts/picket-code-linux-x64.tar.gz release/
-          cp artifacts/SHA256SUMS release/
-          rclone sync release/ r2:picket-releases/ --progress
+        run: rclone sync release/ r2:picket-releases/ --progress
 
       - name: Verify R2 objects
         run: rclone lsl r2:picket-releases/
