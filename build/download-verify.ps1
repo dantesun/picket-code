@@ -8,8 +8,8 @@
   curl 作为直连环境的兜底（-C - 续传）。
 .EXAMPLE
   .\download-verify.ps1
-  .\download-verify.ps1 -Tag v1.143.1-p5
-  .\download-verify.ps1 -Tag v1.143.1-p5 -OutDir D:\Downloads
+  .\download-verify.ps1 -Tag v1.143.1
+  .\download-verify.ps1 -Tag v1.143.1 -OutDir D:\Downloads
   .\download-verify.ps1 -ProxyCredential (Get-Credential)
 .NOTES
   默认 Tag 需与 download-verify.sh / download-verify.bat /
@@ -18,7 +18,7 @@
   代码页解析，中文字符会破坏字符串字面量并直接报语法错误。
 #>
 param(
-  [string]$Tag = "v1.143.1-p5",
+  [string]$Tag = "v1.143.1",
   [string]$Repo = "dantesun/picket-code",
   [string]$OutDir = (Get-Location).Path,
   [pscredential]$ProxyCredential

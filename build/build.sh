@@ -18,7 +18,7 @@
 set -euo pipefail
 
 VSCODE_VERSION="$1"
-PICKET_VERSION="${2#v}"   # CI passes the git tag (v1.143.1-p5); keep the bare version
+PICKET_VERSION="${2#v}"   # CI passes the git tag (v1.143.1); keep the bare version
 PLATFORM="${3:-linux}"
 ARCH="${4:-x64}"
 

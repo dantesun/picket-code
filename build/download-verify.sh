@@ -2,13 +2,13 @@
 # Picket Code 下载 + SHA256 校验（Linux/macOS）
 # 支持：显式进度（curl 进度条）、失败重试 5 次、断点续传（-C -）
 # 用法: ./download-verify.sh [TAG]
-#   bash download-verify.sh              # 默认 v1.143.1-p5
-#   bash download-verify.sh v1.143.1-p5
+#   bash download-verify.sh              # 默认 v1.143.1
+#   bash download-verify.sh v1.143.1
 # 默认 TAG 需与 download-verify.bat / download-verify.ps1 /
 # docs/ai-download-prompt.md 保持一致（build/check-contract.sh 会校验）。
 set -uo pipefail
 
-TAG="${1:-v1.143.1-p5}"
+TAG="${1:-v1.143.1}"
 REPO="dantesun/picket-code"
 
 MACH="$(uname -m)"

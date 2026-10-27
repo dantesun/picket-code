@@ -34,7 +34,7 @@ for f in "$SCRIPT_DIR/download-verify.sh" "$SCRIPT_DIR/download-verify.ps1" "$SC
     fail "$(basename "$f") defaults to $tag, download-verify.sh defaults to $REF_TAG"
   fi
 done
-PROMPT_TAG="$(grep -o 'v[0-9][0-9.]*-p[0-9][0-9]*' "$ROOT_DIR/docs/ai-download-prompt.md" | head -1 || true)"
+PROMPT_TAG="$(grep -oE 'v[0-9][0-9.]*(-p[0-9][0-9]*)?' "$ROOT_DIR/docs/ai-download-prompt.md" | head -1 || true)"
 [ "$PROMPT_TAG" = "$REF_TAG" ] || fail "docs/ai-download-prompt.md says ${PROMPT_TAG:-nothing}, downloaders default to $REF_TAG"
 echo "ok: default tag $REF_TAG (3 downloaders + ai-download-prompt.md)"
 
