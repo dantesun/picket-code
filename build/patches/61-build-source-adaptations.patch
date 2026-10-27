@@ -77,6 +77,17 @@ diff --git a/build/lib/extensions.ts b/build/lib/extensions.ts
 index 10bd9fbd693..45fcb8a21db 100644
 --- a/build/lib/extensions.ts
 +++ b/build/lib/extensions.ts
+@@ -298,6 +298,10 @@
+ 	})
+ 		.pipe(buffer())
+ 		.pipe(vinylZip.src())
++		// vinyl-zip hands out stream contents; the nested filter/restore + buffer chain in
++		// packageMarketplaceExtensionsStream deadlocks while several of those streams are held
++		// back (bundle-marketplace-extensions-build never completes). Buffer eagerly.
++		.pipe(buffer())
+ 		.pipe(filter('extension/**'))
+ 		.pipe(rename(p => p.dirname = p.dirname!.replace(/^extension\/?/, '')))
+ 		.pipe(packageJsonFilter)
 @@ -631,7 +631,7 @@ const esbuildMediaScripts: { script: string; tsconfig: string }[] = [
  	{ script: 'mermaid-markdown-features/esbuild.webview.mts', tsconfig: 'mermaid-markdown-features/preview-src/tsconfig.json' },
  	{ script: 'notebook-renderers/esbuild.notebook.mts', tsconfig: 'notebook-renderers/tsconfig.json' },
