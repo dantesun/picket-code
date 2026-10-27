@@ -9,12 +9,12 @@
   curl 作为直连环境的兜底（-C - 续传）。
 .EXAMPLE
   .\download-verify.ps1
-  .\download-verify.ps1 -Tag v1.143.1-p4 -Source github
-  .\download-verify.ps1 -Tag v1.143.1-p4 -OutDir D:\Downloads
+  .\download-verify.ps1 -Tag v1.143.1-p5 -Source github
+  .\download-verify.ps1 -Tag v1.143.1-p5 -OutDir D:\Downloads
   .\download-verify.ps1 -ProxyCredential (Get-Credential)
 #>
 param(
-  [string]$Tag = "v1.143.1-p4",
+  [string]$Tag = "v1.143.1-p5",
   [string]$Repo = "dsun/picket-code",
   [ValidateSet("gitee","github")][string]$Source = "gitee",
   [string]$OutDir = (Get-Location).Path,
