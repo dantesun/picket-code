@@ -1,0 +1,109 @@
+diff --git a/build/gulpfile.extensions.ts b/build/gulpfile.extensions.ts
+index bc1f9fba71c..fb730c9ca85 100644
+--- a/build/gulpfile.extensions.ts
++++ b/build/gulpfile.extensions.ts
+@@ -96,7 +96,7 @@ const compilations = [
+ 	'.vscode/extensions/vscode-selfhost-import-aid/tsconfig.json',
+ 	'.vscode/extensions/vscode-extras/tsconfig.json',
+ 	'.vscode/extensions/vscode-pr-pinger/tsconfig.json',
+-];
++].filter(f => fs.existsSync(path.join(root, f)));
+ 
+ const getBaseUrl = (out: string) => `https://main.vscode-cdn.net/sourcemaps/${commit}/${out}`;
+ 
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+index 29992ed145e..71632ae4cab 100644
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -432,7 +432,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
+ 			result = es.merge(result, gulp.src('.build/policies/win32/**', { base: '.build/policies/win32' })
+ 				.pipe(rename(f => f.dirname = `policies/${f.dirname}`)));
+ 
+-			if (quality === 'stable' || quality === 'insider') {
++			if (product.win32ContextMenu && (quality === 'stable' || quality === 'insider')) {
+ 				result = es.merge(result, gulp.src('.build/win32/appx/**', { base: '.build/win32' }));
+ 				const rawVersion = version.replace(/-\w+$/, '').split('.');
+ 				const appxVersion = `${rawVersion[0]}.0.${rawVersion[1]}.${rawVersion[2]}`;
+@@ -470,7 +470,7 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
+ function hasAuthenticodeSignature(filePath: string): Promise<boolean> {
+ 	return new Promise((resolve, reject) => {
+ 		const proc = cp.spawn('signtool.exe', ['verify', '/pa', filePath]);
+-		proc.on('error', reject);
++		proc.on('error', () => resolve(false));
+ 		proc.on('exit', code => resolve(code === 0));
+ 	});
+ }
+diff --git a/build/lib/builtInExtensions.ts b/build/lib/builtInExtensions.ts
+index de687da4de4..0da6b24a4fe 100644
+--- a/build/lib/builtInExtensions.ts
++++ b/build/lib/builtInExtensions.ts
+@@ -93,9 +93,9 @@ function getExtensionDownloadStream(extension: IExtensionDefinition) {
+ 			return es.readArray([]);
+ 		}
+ 		input = ext.fromGithub(extension, { asset, latest: isInsiders() });
+-	} else if (productjson.extensionsGallery?.serviceUrl) {
+-		input = ext.fromMarketplace(productjson.extensionsGallery.serviceUrl, extension);
+ 	} else {
++		// Built-in extensions always come from their GitHub releases: the gallery in
++		// product.json is a third-party registry (Open VSX) that does not host them.
+ 		input = ext.fromGithub(extension, { latest: isInsiders() });
+ 	}
+ 
+@@ -133,8 +133,7 @@ export function getExtensionStream(extension: IExtensionDefinition) {
+ }
+ 
+ function syncMarketplaceExtension(extension: IExtensionDefinition): Stream {
+-	const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
+-	const source = ansiColors.blue(galleryServiceUrl ? '[marketplace]' : '[github]');
++	const source = ansiColors.blue('[github]');
+ 	if (isUpToDate(extension)) {
+ 		log(source, `${extension.name}@${extension.version}`, ansiColors.green('✔︎'));
+ 		return es.readArray([]);
+diff --git a/build/lib/copilot.ts b/build/lib/copilot.ts
+index dc9941b71e7..904f915e3d5 100644
+--- a/build/lib/copilot.ts
++++ b/build/lib/copilot.ts
+@@ -274,7 +274,8 @@ export function prepareBuiltInCopilotRipgrepShim(platform: string, arch: string,
+ 	const copilotBase = path.join(extensionNodeModules, '@github', 'copilot');
+ 	const copilotSdkBase = path.join(copilotBase, 'sdk');
+ 	if (!fs.existsSync(copilotSdkBase)) {
+-		throw new Error(`[prepareBuiltInCopilotRipgrepShim] Copilot SDK directory not found at ${copilotSdkBase}`);
++		console.warn(`[picket-code] Copilot extension removed; skipping ripgrep shim: ${copilotSdkBase}`);
++		return;
+ 	}
+ 	materializeBuiltInCopilotSdkPlatformFiles(copilotPackagePlatformArch, tgrepPlatformArch, copilotBase, appNodeModulesDir, options);
+ 	pruneNonTargetCopilotSdkPrebuilds(copilotPackagePlatformArch, path.join(copilotSdkBase, 'prebuilds'), copilotPlatforms);
+diff --git a/build/lib/extensions.ts b/build/lib/extensions.ts
+index 10bd9fbd693..45fcb8a21db 100644
+--- a/build/lib/extensions.ts
++++ b/build/lib/extensions.ts
+@@ -631,7 +631,7 @@ const esbuildMediaScripts: { script: string; tsconfig: string }[] = [
+ 	{ script: 'mermaid-markdown-features/esbuild.webview.mts', tsconfig: 'mermaid-markdown-features/preview-src/tsconfig.json' },
+ 	{ script: 'notebook-renderers/esbuild.notebook.mts', tsconfig: 'notebook-renderers/tsconfig.json' },
+ 	{ script: 'simple-browser/esbuild.webview.mts', tsconfig: 'simple-browser/preview-src/tsconfig.json' },
+-];
++].filter(({ script, tsconfig }) => fs.existsSync(path.join(extensionsPath, script)) && fs.existsSync(path.join(extensionsPath, tsconfig)));
+ 
+ export function buildExtensionMedia(isWatch: boolean, outputRoot?: string): Promise<void> {
+ 	const esbuildTask = esbuildExtensions('esbuilding extension media', isWatch, esbuildMediaScripts.map(({ script }) => ({
+diff --git a/build/npm/dirs.ts b/build/npm/dirs.ts
+index 89f8708b405..056e0f50211 100644
+--- a/build/npm/dirs.ts
++++ b/build/npm/dirs.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { existsSync } from 'fs';
++import path from 'path';
+ 
+ /**
+  * Complete list of directories where npm should be executed to install node modules
+@@ -64,7 +65,7 @@ export const dirs = [
+ 	'.vscode/extensions/vscode-selfhost-test-provider',
+ 	'.vscode/extensions/vscode-extras',
+ 	'.vscode/extensions/vscode-pr-pinger',
+-];
++].filter(dir => dir === '' || existsSync(path.join(import.meta.dirname, '../..', dir)));
+ 
+ if (existsSync(`${import.meta.dirname}/../../.build/distro/npm`)) {
+ 	dirs.push('.build/distro/npm');

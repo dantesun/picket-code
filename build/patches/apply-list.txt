@@ -3,15 +3,16 @@
 # One filename per line (relative to build/patches/). Lines starting with '#'
 # are comments. A listed patch MUST apply cleanly, otherwise build.sh aborts.
 #
-# Status (2026-10-23, upstream tag 1.143.1):
-#   - 52-ext-copilot-remove-it.json : ENABLED (JSON actions, applied automatically)
-#   - 53-ext-copilot-remove-it.patch : ENABLED — rebase v2 against 1.142.0 + 52
+# Status (2026-10-27, upstream tag 1.143.1 = e646868227c, verified forward on a clean tree):
+#   - 52-ext-copilot-remove-it.json  : ENABLED (JSON actions, applied automatically)
+#   - 53-ext-copilot-remove-it.patch : ENABLED — Copilot/agentHost reference cleanup
 #     (28 modified + 2 deleted files), verified forward on a clean worktree.
+#   - 54-picket-code-disable-node-compile-cache.patch : ENABLED (build reproducibility)
+#   - 55 : ASAR unpack list, merged from the former 55-60 series into one hunk,
+#     so adding a module no longer depends on the previous patch's context.
+#   - 61 : build-script adaptations (dirs.ts / gulpfile filters, AppX + signtool
+#     tolerance, built-in extensions from GitHub). Supersedes patch-vscode.py.
 53-ext-copilot-remove-it.patch
 54-picket-code-disable-node-compile-cache.patch
-55-picket-unpack-policy-watcher.patch
-56-picket-unpack-loader-chain.patch
-57-picket-unpack-spdlog-registry.patch
-58-picket-unpack-all-natives.patch
-59-picket-unpack-agenthost-dynamic-imports.patch
-60-picket-unpack-cjs-interop-chain.patch
+55-picket-unpack-native-and-agenthost.patch
+61-build-source-adaptations.patch

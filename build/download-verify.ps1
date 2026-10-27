@@ -1,22 +1,25 @@
 ﻿<#
 .SYNOPSIS
-  Picket Code 自动下载 + 合并 + SHA256 校验（Windows PowerShell 版）
+  Picket Code 下载 + SHA256 校验（Windows PowerShell 版）
 .DESCRIPTION
-  从 Gitee/GitHub Release 自动下载全部分卷段，合并还原原始包，并与
-  release 描述中的【合并后校验值】比对。
+  从 GitHub Release 下载当前平台的发行包，并与同一 Release 的 SHA256SUMS 比对。
   支持：显式进度（百分比）、失败重试 5 次、断点续传。
   代理策略：WebRequest 自动使用系统代理 + 当前 Windows 用户凭据（解决企业代理 407）；
   curl 作为直连环境的兜底（-C - 续传）。
 .EXAMPLE
   .\download-verify.ps1
-  .\download-verify.ps1 -Tag v1.143.1-p5 -Source github
+  .\download-verify.ps1 -Tag v1.143.1-p5
   .\download-verify.ps1 -Tag v1.143.1-p5 -OutDir D:\Downloads
   .\download-verify.ps1 -ProxyCredential (Get-Credential)
+.NOTES
+  默认 Tag 需与 download-verify.sh / download-verify.bat /
+  docs/ai-download-prompt.md 保持一致（build/check-contract.sh 会校验）。
+  本文件必须保存为 UTF-8 with BOM：Windows PowerShell 5.1 对无 BOM 的脚本按系统 ANSI
+  代码页解析，中文字符会破坏字符串字面量并直接报语法错误。
 #>
 param(
   [string]$Tag = "v1.143.1-p5",
-  [string]$Repo = "dsun/picket-code",
-  [ValidateSet("gitee","github")][string]$Source = "gitee",
+  [string]$Repo = "dantesun/picket-code",
   [string]$OutDir = (Get-Location).Path,
   [pscredential]$ProxyCredential
 )
@@ -30,8 +33,7 @@ $arch = if ($mach -match "ARM|aarch64") { "arm64" } else { "x64" }
 $ext = if ($os -eq "win32") { "zip" } else { "tar.gz" }
 $base = "picket-code-$os-$arch.$ext"
 
-$hostName = if ($Source -eq "github") { "github.com/dantesun/picket-code" } else { "gitee.com/$Repo" }
-$prefix = "https://$hostName/releases/download/$Tag"
+$prefix = "https://github.com/$Repo/releases/download/$Tag"
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
 
 # 代理凭据：显式传入优先，否则用当前 Windows 用户（DefaultCredentials）
@@ -87,53 +89,50 @@ function Download-Resume {
   return $false
 }
 
-Write-Host "== 下载 $base (源: $Source, Tag: $Tag) =="
-$segments = @()
-$i = 0
-while ($true) {
-  $segName = "{0}.{1:D2}.part" -f $base, $i
-  $segPath = Join-Path $OutDir $segName
-  $url = "$prefix/$segName"
-  Write-Host "  段 $segName ..."
-  $ok = Download-Resume -Url $url -Path $segPath
-  if (-not $ok) {
-    if ($i -eq 0) { throw "第一段下载失败: $url" }
-    break
-  }
-  $segments += $segPath
-  $i++
-}
-if ($segments.Count -eq 0) { throw "未下载到任何分卷段" }
-
-Write-Host "== 合并 $($segments.Count) 段 =="
-$merged = Join-Path $OutDir $base
-[System.IO.File]::WriteAllBytes($merged, [System.IO.File]::ReadAllBytes($segments[0]))
-foreach ($p in $segments[1..($segments.Count - 1)]) {
-  [System.IO.File]::AppendAllBytes($merged, [System.IO.File]::ReadAllBytes($p))
-}
-
-Write-Host "== 校验 SHA256 =="
-$hash = (Get-FileHash -Algorithm SHA256 $merged).Hash.ToLower()
-$mergePath = Join-Path $OutDir "MERGE.txt"
-& curl.exe -fSL --retry 3 -o $mergePath "$prefix/MERGE.txt" 2>$null
-if ($LASTEXITCODE -ne 0) {
+# 下载小文件（SHA256SUMS）：curl 优先，失败改用走系统代理的 WebClient
+function Get-RemoteFile {
+  param([string]$Url, [string]$Path)
+  # PS 5.1 会把原生命令的 stderr（含 curl 进度条）在 $ErrorActionPreference='Stop' 下
+  # 变成 NativeCommandError，因此这里改用 -s 静音并把偏好降级为本函数局部。
+  $ErrorActionPreference = "Continue"
+  & curl.exe -fsSL --retry 3 -o $Path $Url
+  if ($LASTEXITCODE -eq 0) { return $true }
   try {
     $wc = New-Object System.Net.WebClient
     $wc.Proxy = [System.Net.WebRequest]::GetSystemWebProxy()
     $wc.Proxy.Credentials = $proxyCred
-    $wc.DownloadFile("$prefix/MERGE.txt", $mergePath)
-  } catch { throw "下载 MERGE.txt 失败: $($_.Exception.Message)" }
+    $wc.DownloadFile($Url, $Path)
+    return $true
+  } catch {
+    return $false
+  }
 }
+
+$target = Join-Path $OutDir $base
+Write-Host "== 下载 $base (Tag: $Tag) =="
+if (-not (Download-Resume -Url "$prefix/$base" -Path $target)) { throw "下载失败: $prefix/$base" }
+
+Write-Host "== 校验 SHA256 =="
+$hash = (Get-FileHash -Algorithm SHA256 $target).Hash.ToLower()
+$sumsPath = Join-Path $OutDir "SHA256SUMS"
 $expected = $null
-foreach ($line in Get-Content $mergePath -Encoding UTF8) {
-  if ($line -match ("合并后校验值.*" + [regex]::Escape($base) + " = ([0-9a-f]+)")) { $expected = $Matches[1] }
+if (Get-RemoteFile -Url "$prefix/SHA256SUMS" -Path $sumsPath) {
+  foreach ($line in Get-Content $sumsPath -Encoding UTF8) {
+    if ($line -match "^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$" -and $Matches[2] -eq $base) { $expected = $Matches[1].ToLower() }
+  }
 }
-if (-not $expected) { throw "MERGE.txt 中未找到 $base 的合并后校验值" }
+
+if (-not $expected) {
+  Write-Host "警告: SHA256SUMS 中没有 $base，请与该 Release 的说明手工比对" -ForegroundColor Yellow
+  Write-Host "SHA256: $hash"
+  Write-Host "完成。解压 $target 后即可使用。"
+  exit 0
+}
 
 if ($hash -eq $expected) {
   Write-Host "校验通过: $base" -ForegroundColor Green
   Write-Host "SHA256: $hash"
-  Write-Host "完成。解压 $merged 后即可使用。"
+  Write-Host "完成。解压 $target 后即可使用。"
 } else {
   Write-Host "校验失败!" -ForegroundColor Red
   Write-Host "实际: $hash"

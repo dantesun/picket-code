@@ -86,6 +86,10 @@ jobs:
 
       - name: Compile
         shell: bash
+        env:
+          # Built-in extensions (ms-vscode.js-debug*) are fetched from their GitHub releases;
+          # the token lifts the 60 req/h anonymous API limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           bash build/build.sh "${{ needs.versions.outputs.vscode }}" \
             "${{ needs.versions.outputs.picket-code }}" \
@@ -137,7 +141,10 @@ jobs:
         shell: bash
         run: |
           cd "$GITHUB_WORKSPACE"
-          sha256sum picket-code-${{ matrix.platform }}-${{ matrix.arch }}.* > SHA256SUMS
+          # One file per matrix job: a plain SHA256SUMS would be overwritten by the other
+          # job when the artifacts are merged with `merge-multiple`.
+          sha256sum picket-code-${{ matrix.platform }}-${{ matrix.arch }}.* \
+            > SHA256SUMS-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Upload picket-code artifacts
         uses: actions/upload-artifact@v7
@@ -145,7 +152,7 @@ jobs:
           name: picket-code-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             picket-code-${{ matrix.platform }}-${{ matrix.arch }}.*
-            SHA256SUMS
+            SHA256SUMS-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
 
   release:
@@ -158,6 +165,13 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - name: Merge per-arch checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat artifacts/SHA256SUMS-* > artifacts/SHA256SUMS
+          cat artifacts/SHA256SUMS
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

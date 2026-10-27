@@ -64,12 +64,13 @@
 
 | 组件 | 职责 | 状态 |
 |---|---|---|
-| `build/build.sh` | 编译阶段：clone 钉版 → 裁扩展（`extensions-remove.list`）→ `patch-vscode.py` 打补丁 → npm ci（重试 5 次）→ `vscode-<plat>-<arch>-min` → 打包 vscode.tar.gz | confirmed，已提交 main |
+| `build/build.sh` | 编译阶段：契约自检（`check-contract.sh`）→ clone 钉版 → 裁扩展（`extensions-remove.list`）→ `apply-patches.sh` 打补丁 → npm ci（重试 5 次）→ 写回版本号 → `vscode-<plat>-<arch>-min` → 打包 vscode.tar.gz | confirmed，已提交 main |
 | `build/linux/package.sh` | 解包 → 重命名 `VSCode-linux-<arch>` → `picket-code-linux-<arch>` → tar.gz | confirmed，已提交 main |
 | `build/win32/package.sh` | 解包 → 杀占用进程/清只读属性 → 带重试 mv → robocopy /MOVE 兜底 → 7z/tar/Compress-Archive 三级压缩 | confirmed，已提交 main（修复 Permission denied 根因） |
 | `.github/workflows/release.yml` | 四 job：versions（解版本）→ compile（linux/win32 matrix）→ package → release | confirmed，已提交 main |
 | `build/product.json` | 品牌（picket-code/Picket Code）、telemetry off、Open VSX 市场、updateUrl 指向本项目 Releases | confirmed |
-| `build/patch-vscode.py` | 7 处锚点补丁：product.json merge、copilot.ts 守卫 no-op、npm/dirs.ts 过滤、gulpfile.extensions 过滤、lib/extensions 过滤、AppX 跳过、signtool 缺失容忍 | confirmed |
+| `build/apply-patches.sh` | 三步执行器：① product.json merge（内嵌 python3）② `patches/52*.json` 路径删除（缺失即 exit 4）③ `patches/apply-list.txt` 逐个 `git apply` | confirmed |
+| `build/patches/61-build-source-adaptations.patch` | 构建脚本适配 6 处：copilot.ts 守卫改告警、npm/dirs.ts 过滤、gulpfile.extensions 过滤、lib/extensions 媒体过滤、AppX 跳过、signtool 缺失容忍，另加 `builtInExtensions.ts` 只走 GitHub 下载 | confirmed |
 | `build/extensions-remove.list` | 内置扩展最小集清单（保留 32 + 构建期 3，移除 65） | confirmed |
 
 ### 3.2 关键缺口（复核确认）
@@ -128,9 +129,9 @@
 | 环节 | VSCodium 做法 | Picket Code 现状 | 差距 |
 |---|---|---|---|
 | 钉版 | version.sh 取 MS_COMMIT 钉版 | build.sh 由 CI versions job 传入 tag | 已对齐 |
-| 品牌与产品配置 | prepare_vscode.sh 用 jq setpath 改 product.json | patch-vscode.py 做 product.json merge | 已对齐（机制不同，效果等价） |
-| JSON 删除补丁 | `patches/*.json`（逐条 rm -rf，路径缺失 exit 4） | 无 | **待引入**（P2 复用 52 号） |
-| git apply 补丁 | `patches/*.patch`（占位符替换后 `git apply --ignore-whitespace`） | 无 | **待引入**（P2 复用 53 号） |
+| 品牌与产品配置 | prepare_vscode.sh 用 jq setpath 改 product.json | `apply-patches.sh` 内嵌 python3 做 product.json merge | 已对齐（机制不同，效果等价） |
+| JSON 删除补丁 | `patches/*.json`（逐条 rm -rf，路径缺失 exit 4） | `patches/52-ext-copilot-remove-it.json`（177 条路径，同上语义） | 已对齐 |
+| git apply 补丁 | `patches/*.patch`（占位符替换后 `git apply --ignore-whitespace`） | `patches/apply-list.txt`（53/54/55/61，逐个 `--check` 后应用） | 已对齐 |
 | 构建 | `vscode-min-prepack` → `vscode-<plat>-<arch>-min-packing`（旧 gulp 任务） | `vscode-<plat>-<arch>-min`（现代 gulp 任务，产物完整目录） | 已对齐现代上游，**不能照抄旧任务名** |
 | CI 分离 | compile job → package jobs → release | 四 job 流水线 | 已对齐 |
 | Windows 打包 | 平台脚本 + 校验和 | 加固版（杀进程/只读清理/robocopy 兜底） | 已对齐且加固 |
@@ -216,8 +217,8 @@ versions ──► compile(linux) ──┐
 - 52 号：177 条物理删除路径（含 80+ 测试文件、`historyRecordFixtures.ts`），workbench 路径 0 条。
 - 53 号：26 文件引用清理（provider 注册块整段删除、`providerConfigurations: []`、SDK 依赖删除、OTel 钩子 no-op）。
 - **修正**：`mockAgent.ts` 在 53 中被就地裁剪（移除 `historyRecordFixtures` 依赖）后保留，不需“恢复”，作 iCode 适配器参考。
-- Picket Code 补丁执行器已决策对齐 VSCodium 机制：JSON actions（rm -rf）+ git apply；当前 Python 锚点脚本只覆盖 7 处、不覆盖平台层，作为过渡工具迁移后移除。
-- **落地状态（2026-10-23）**：执行器 `build/apply-patches.sh` 已实现并集成（build.sh 在 patch-vscode.py 前调用）；52 已启用并本地实测 177/177 路径删除成功——`node/codex`、`node/otel`、`node/clientTools`、`common/otel`、`extensions/copilot` 整删，`node/copilot` 余 30 文件、`node/claude` 余 2 文件（`claudeProxyAuth.ts`、`claudeTerminalOutput.ts`）；53 已入库未启用，待 rebase 到 1.142.0（见 `build/patches/README.md`，P2 首个任务）。52 单独应用后完整编译预期失败（引用清理未完成），属预期中间态。
+- Picket Code 补丁执行器已决策对齐 VSCodium 机制：JSON actions（rm -rf）+ git apply；原 Python 锚点脚本的 6 处代码改写已全部迁入 `patches/61-build-source-adaptations.patch`，脚本本身删除。
+- **落地状态（2026-10-27）**：执行器 `build/apply-patches.sh` 是唯一补丁入口（`build.sh` 只调用它一次），顺序为 product.json merge → 52 → 53 → 54 → 55 → 61；在 vscode `1.143.1`（`e646868227c`）上实测 52 删除 177/177 路径、53/54/55/61 全部干净应用。52 单独应用后完整编译预期失败（引用清理未完成），属预期中间态。
 
 ### 6.3 iCode 适配器四件套（P3）
 
@@ -330,7 +331,7 @@ src/vs/platform/agentHost/node/icode/
 | F3 | 聊天 UI 在 workbench 核心 | `workbench/contrib/chat/browser/agentSessions/agentHost/agentHost.contribution.ts` |
 | F4 | iCode one-shot CLI、OTel gRPC 可用、HTTP/protobuf 缺依赖 | iCode 源码 + 本地 debug.log 实证 |
 | F5 | 金发〔2026〕8号 八章三十二条，2026-06-18 印发 | nfra.gov.cn 官方全文 |
-| F6 | Picket Code 构建现状（build.sh/package.sh/release.yml/product.json/patch-vscode.py/extensions-remove.list） | dantesun/picket-code main（2026-10-23 读取） |
+| F6 | Picket Code 构建现状（build.sh/package.sh/release.yml/product.json/apply-patches.sh/extensions-remove.list） | dantesun/picket-code main（2026-10-27 读取） |
 | F7 | README/roadmap 曾引用已删除的 prepare.sh | 同上（K4 缺口，已随本版修订） |
 
 ### 10.2 术语表

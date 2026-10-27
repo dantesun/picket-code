@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# check-contract.sh — assert the facts that span several files and used to drift silently.
+#
+# The release contract is spread over four downloaders, the docs and product.json; a bump
+# that touches only some of them shipped wrong artifacts (tag drift) or promised a layout
+# the packaging script does not produce. This runs in the compile stage, so a mismatch
+# fails the release before anything is published.
+#
+# Usage: check-contract.sh
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+FAILED=0
+
+fail() { echo "FAIL: $*" >&2; FAILED=1; }
+
+# ---- 1. every downloader defaults to the same tag ----
+default_tag() {
+  case "$1" in
+    *.sh)  sed -n 's/^TAG="\${1:-\(v[0-9][^}]*\)}".*/\1/p' "$1" ;;
+    *.ps1) sed -n 's/^  \[string\]\$Tag = "\(v[0-9][^"]*\)",.*/\1/p' "$1" ;;
+    *.bat) sed -n 's/^if "%TAG%"=="" set "TAG=\(v[0-9][^"]*\)".*/\1/p' "$1" ;;
+  esac
+}
+
+REF_TAG=""
+for f in "$SCRIPT_DIR/download-verify.sh" "$SCRIPT_DIR/download-verify.ps1" "$SCRIPT_DIR/download-verify.bat"; do
+  tag="$(default_tag "$f")"
+  [ -n "$tag" ] || { fail "$(basename "$f"): no default tag found"; continue; }
+  if [ -z "$REF_TAG" ]; then
+    REF_TAG="$tag"
+  elif [ "$tag" != "$REF_TAG" ]; then
+    fail "$(basename "$f") defaults to $tag, download-verify.sh defaults to $REF_TAG"
+  fi
+done
+PROMPT_TAG="$(grep -o 'v[0-9][0-9.]*-p[0-9][0-9]*' "$ROOT_DIR/docs/ai-download-prompt.md" | head -1 || true)"
+[ "$PROMPT_TAG" = "$REF_TAG" ] || fail "docs/ai-download-prompt.md says ${PROMPT_TAG:-nothing}, downloaders default to $REF_TAG"
+echo "ok: default tag $REF_TAG (3 downloaders + ai-download-prompt.md)"
+
+# ---- 2. archive layout promised by the docs matches the packaging scripts ----
+layout_ok=1
+grep -q 'picket-code-win32-x64\\Picket Code.exe' "$ROOT_DIR/docs/download-one-liner.md" || layout_ok=0
+# The zip must contain `picket-code-win32-<arch>/` as its single top-level dir, i.e. the
+# archive source argument is "$OUT_DIR" itself, not "$OUT_DIR"/*.
+grep -q -- '-tzip "[^"]*" "\$OUT_DIR"' "$SCRIPT_DIR/win32/package.sh" || layout_ok=0
+if [ "$layout_ok" -eq 1 ]; then
+  echo "ok: win32 archive layout matches docs"
+else
+  fail "win32 zip layout and docs/download-one-liner.md disagree (top-level picket-code-win32-x64/ dir)"
+fi
+
+# ---- 3. built-in extensions stay in product.json and 61 keeps them servable ----
+python3 - "$ROOT_DIR" <<'PYEOF' || FAILED=1
+import json, sys
+root = sys.argv[1]
+with open(f'{root}/build/product.json', encoding='utf-8') as f:
+    product = json.load(f)
+names = {e['name'] for e in product.get('builtInExtensions', [])}
+missing = {'ms-vscode.js-debug', 'ms-vscode.js-debug-companion'} - names
+if missing:
+    print('FAIL: build/product.json lost built-in extension(s): ' + ', '.join(sorted(missing)), file=sys.stderr)
+    sys.exit(1)
+if not product.get('extensionsGallery', {}).get('serviceUrl'):
+    print('FAIL: build/product.json has no extensionsGallery.serviceUrl', file=sys.stderr)
+    sys.exit(1)
+PYEOF
+grep -q "fromGithub" "$SCRIPT_DIR/patches/61-build-source-adaptations.patch" \
+  || fail "61-build-source-adaptations.patch no longer forces built-in extensions onto GitHub"
+echo "ok: built-in extensions (js-debug) kept and fetched from GitHub"
+
+# ---- 4. artifacts come from the GitHub release and are verified against SHA256SUMS ----
+for f in download-verify.sh download-verify.ps1 download-verify.bat; do
+  grep -q 'SHA256SUMS' "$SCRIPT_DIR/$f" || fail "$f no longer verifies against the release SHA256SUMS"
+done
+# Gitee mirrors the source only; a release-download URL there would 404.
+if grep -rq --exclude=check-contract.sh 'gitee\.com/[^ "]*releases/download' "$ROOT_DIR/build" "$ROOT_DIR/docs" "$ROOT_DIR/.github" 2>/dev/null; then
+  fail "a Gitee release-download URL is still referenced (Gitee hosts source only, no release assets)"
+else
+  echo "ok: artifacts fetched from GitHub Releases + verified against SHA256SUMS"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "==> [picket-code] release contract check FAILED" >&2
+  exit 1
+fi
+echo "==> [picket-code] release contract check passed"

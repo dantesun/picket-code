@@ -1,17 +1,21 @@
 # build/patches — Copilot removal patch status
 
-Status: 2026-10-23, pinned upstream tag `1.142.0` (commit d956e8a6), 53 rebase complete + CI-chain verified.
+Status: 2026-10-27, pinned upstream tag `1.143.1` (commit e646868227c), full set re-verified
+forward on a clean 1.143.1 tree.
 
 ## Files
 
 | File | Kind | Status |
 |---|---|---|
-| `52-ext-copilot-remove-it.json` | JSON actions (physical removals) | **ENABLED** — 177/177 removal paths verified present on 1.142.0 and applied cleanly |
-| `53-ext-copilot-remove-it.patch` | git apply (reference cleanup, 30 files) | **ENABLED (rebase v2)** — regenerated against 1.142.0 + 52; 28 modified + 2 deleted files |
+| `52-ext-copilot-remove-it.json` | JSON actions (physical removals) | **ENABLED** — 177/177 removal paths verified present on 1.143.1 and applied cleanly |
+| `53-ext-copilot-remove-it.patch` | git apply (reference cleanup, 30 files) | **ENABLED (rebase v2)** — 28 modified + 2 deleted files; still applies cleanly on 1.143.1 |
 | `54-picket-code-disable-node-compile-cache.patch` | git apply (build reproducibility) | **ENABLED** — `shouldGenerateNodeCompileCache` returns false (win32 EBUSY + nondeterministic cache output) |
+| `55-picket-unpack-native-and-agenthost.patch` | git apply (ASAR unpack list) | **ENABLED** — merges the former 55–60 series into one hunk (see below) |
+| `61-build-source-adaptations.patch` | git apply (build script adaptations) | **ENABLED** — replaces `patch-vscode.py` (6 anchors, see below) |
 
 Source: https://github.com/VSCodium/vscodium/tree/master/patches (MIT). Picket Code applies
-52 via `build/apply-patches.sh` (JSON removals) then 53 (git apply) in order.
+`build/product.json` (merge), then 52 via `build/apply-patches.sh` (JSON removals), then the
+`git apply` list in the order pinned by `apply-list.txt`.
 
 ## 53 rebase v2 (2026-10-23)
 
@@ -62,11 +66,44 @@ applies cleanly with `git apply --ignore-whitespace --check`.
   config reads, `copilotBuiltinAgents.ts` (copilot dir, test-only import), comment in
   `agentSdkDownloader.ts`. All outside the esbuild bundle graph.
 
+## 55 — one ASAR unpack list instead of six patches (2026-10-27)
+
+The former `55-picket-unpack-policy-watcher` … `60-picket-unpack-cjs-interop-chain` series
+all appended entries to the same array in `build/gulpfile.vscode.ts` (`createAsar(...)`), so
+every patch depended on the context left by the previous one: reordering a single entry broke
+all later patches. They are now one hunk with the entries grouped by reason (policy-watcher,
+Node 24 loader chain, official native modules, AgentHost dynamic imports, CJS interop chain).
+Regenerated against `1.143.1 + 52 + 53 + 54`; the resulting `gulpfile.vscode.ts` is byte-identical
+to applying 55–60 in sequence (verified by blob comparison). Adding a module is now a one-line
+edit to a single patch.
+
+## 61 — build script adaptations, replacing patch-vscode.py (2026-10-27)
+
+`build/patch-vscode.py` did seven anchor replacements with a `str.replace()`; six of them are
+code edits and are now `61-build-source-adaptations.patch` (the seventh, the `product.json`
+merge, moved into `apply-patches.sh` as a JSON merge, which cannot be expressed as a stable
+text patch because upstream rewrites that file every release). Contents:
+
+- `build/npm/dirs.ts` — filter out extension directories removed by 52 before `npm ci`.
+- `build/gulpfile.extensions.ts` / `build/lib/extensions.ts` — compile/media only for
+  tsconfigs and scripts that still exist after 52.
+- `build/lib/copilot.ts` — missing Copilot SDK directory is a warning, not a throw.
+- `build/gulpfile.vscode.ts` — skip AppX packaging when `win32ContextMenu` is absent; treat a
+  missing `signtool.exe` as "unsigned" instead of rejecting.
+- `build/lib/builtInExtensions.ts` — always fetch built-in extensions from their GitHub
+  releases. The gallery in `product.json` is Open VSX, which does not host the
+  `ms-vscode.js-debug*` packages; without this branch the build fails or silently ships no
+  debugger.
+
+Every replacement stays anchor-asserted: `apply-patches.sh` runs each listed patch through
+`git apply --check` first, so an upstream drift fails the build instead of silently producing
+a half-patched tree.
+
 ## Build order reminder
 
 52 alone removes the providers' sources, so a full compile FAILS until 53 (reference
-cleanup) is applied too. All three are now in `apply-list.txt` and run in CI order
-52 → 53 → 54.
+cleanup) is applied too. All five entries are in `apply-list.txt` and run in CI order
+`product.json merge → 52 → 53 → 54 → 55 → 61`.
 
 ## Why Picket Code disables the node compile cache (54)
 

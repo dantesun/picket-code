@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# Picket Code 自动下载 + 合并 + SHA256 校验（Linux/macOS）
-# 支持：显式进度（curl 进度条 + 每段大小）、失败重试 5 次、断点续传（-C -）
-# 用法: ./download-verify.sh [TAG] [gitee|github]
-#   bash download-verify.sh                # 默认 v1.143.1-p5, gitee 源
-#   bash download-verify.sh v1.143.1-p5 github
+# Picket Code 下载 + SHA256 校验（Linux/macOS）
+# 支持：显式进度（curl 进度条）、失败重试 5 次、断点续传（-C -）
+# 用法: ./download-verify.sh [TAG]
+#   bash download-verify.sh              # 默认 v1.143.1-p5
+#   bash download-verify.sh v1.143.1-p5
+# 默认 TAG 需与 download-verify.bat / download-verify.ps1 /
+# docs/ai-download-prompt.md 保持一致（build/check-contract.sh 会校验）。
 set -uo pipefail
 
 TAG="${1:-v1.143.1-p5}"
-SOURCE="${2:-gitee}"
+REPO="dantesun/picket-code"
 
 MACH="$(uname -m)"
 case "$MACH" in arm64|aarch64) ARCH="arm64";; *) ARCH="x64";; esac
 BASE="picket-code-linux-$ARCH.tar.gz"
 if [ "$(uname -s)" = "Darwin" ]; then BASE="picket-code-darwin-$ARCH.tar.gz"; fi
-
-if [ "$SOURCE" = "github" ]; then
-  PREFIX="https://github.com/dantesun/picket-code/releases/download/$TAG"
-else
-  PREFIX="https://gitee.com/dsun/picket-code/releases/download/$TAG"
-fi
+PREFIX="https://github.com/$REPO/releases/download/$TAG"
 
 # 下载单文件：重试 5 次；优先断点续传（-C -），服务器不支持 Range 时自动降级全量
 fetch() {
@@ -45,40 +42,38 @@ fetch() {
   done
 }
 
-echo "== 下载 $BASE (源: $SOURCE, Tag: $TAG) =="
-SEGS=()
-i=0
-while :; do
-  s=$(printf '%02d' "$i")
-  f="$BASE.$s.part"
-  echo "  段 $s ..."
-  if ! fetch "$PREFIX/$f" "$f"; then
-    [ "$i" -eq 0 ] && { echo "第一段下载失败: $PREFIX/$f"; exit 1; }
-    rm -f "$f"
-    break
+# macOS 只有 shasum
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
   fi
-  echo "  段 $s 完成: $(du -h "$f" | cut -f1)"
-  SEGS+=("$f")
-  i=$((i + 1))
-done
-[ "${#SEGS[@]}" -eq 0 ] && { echo "未下载到任何分卷段"; exit 1; }
+}
 
-echo "== 合并 ${#SEGS[@]} 段 =="
-cat "${SEGS[@]}" > "$BASE"
+echo "== 下载 $BASE (Tag: $TAG) =="
+fetch "$PREFIX/$BASE" "$BASE" || { echo "下载失败: $PREFIX/$BASE"; exit 1; }
 
 echo "== 校验 SHA256 =="
-HASH=$(sha256sum "$BASE" | awk '{print $1}')
-curl -fSL --retry 3 -o MERGE.txt "$PREFIX/MERGE.txt" 2>/dev/null || echo "警告: 无法下载 MERGE.txt，请与 Release 描述校验值手工比对"
-EXPECTED=$(grep "合并后校验值.*${BASE} = " MERGE.txt 2>/dev/null | grep -oE '[0-9a-f]{64}' | tail -1)
-if [ -n "$EXPECTED" ] && [ "$HASH" != "$EXPECTED" ]; then
+HASH="$(sha256_of "$BASE")"
+EXPECTED=""
+rm -f SHA256SUMS
+if fetch "$PREFIX/SHA256SUMS" SHA256SUMS; then
+  # GNU coreutils writes "<hash>  <name>" (text mode) or "<hash> *<name>" (binary mode,
+  # which is what the Windows runner produces).
+  EXPECTED="$(awk -v f="$BASE" '{ n = $2; sub(/^\*/, "", n); sub(/\r$/, "", n) } n == f { print $1 }' SHA256SUMS | tail -1)"
+fi
+if [ -z "$EXPECTED" ]; then
+  echo "警告: SHA256SUMS 中没有 $BASE，请与该 Release 的说明手工比对"
+  echo "SHA256: $HASH"
+  exit 0
+fi
+if [ "$HASH" != "$EXPECTED" ]; then
   echo "校验失败!"
   echo "实际: $HASH"
   echo "预期: $EXPECTED"
   exit 1
-elif [ -n "$EXPECTED" ]; then
-  echo "校验通过: $BASE"
-  echo "SHA256: $HASH"
-else
-  echo "SHA256: $HASH（无 MERGE.txt，请手工比对 Release 描述）"
 fi
+echo "校验通过: $BASE"
+echo "SHA256: $HASH"
 echo "完成。解压 $BASE 后即可使用。"

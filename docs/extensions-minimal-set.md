@@ -65,7 +65,7 @@ Picket Code 只内置**最小必要**的扩展：降低攻击面、移除微软/
 ## 机制
 
 - `build/extensions-remove.list`：每行一个扩展目录名；`build/build.sh` 在 `npm ci`/`gulp` 前删除这些目录。
-- JS 调试三件套由 `product.json` 的 `builtInExtensions` 配置，不受影响。
+- JS 调试三件套由 `product.json` 的 `builtInExtensions` 配置，构建期从各自 GitHub Release 直接下载 vsix（不经 Open VSX），不受本清单影响。
 - 恢复某扩展：从清单删除对应行后重建，或后续从受控市场安装。
 
 ## 下一步
