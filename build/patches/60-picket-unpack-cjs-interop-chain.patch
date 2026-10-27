@@ -1,0 +1,19 @@
+diff --git a/build/gulpfile.vscode.ts b/build/gulpfile.vscode.ts
+--- a/build/gulpfile.vscode.ts
++++ b/build/gulpfile.vscode.ts
+@@ -264,6 +264,15 @@
+ 				'**/@xterm/xterm/**',
++				// CommonJS modules resolved through the ESM-loader interop path
++				// (extension host bootstrap + @vscode/deviceid -> fs-extra chain):
++				// Node reads their package.json via internal paths that bypass the
++				// ASAR fs patch on Windows long paths.
++				'**/minimist/**',
++				'**/fs-extra/**',
++				'**/graceful-fs/**',
++				'**/jsonfile/**',
++				'**/universalify/**',
+ 				// The Dev Container CLI is spawned as an external Node process,
+ 				// so its bundled entrypoint must be available outside the ASAR.
+ 				'**/@devcontainers/cli/**',
+ 				'**/node-pty/build/Release/*',
+ 				'**/node-pty/build/Release/conpty/*',

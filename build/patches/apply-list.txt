@@ -14,3 +14,4 @@
 57-picket-unpack-spdlog-registry.patch
 58-picket-unpack-all-natives.patch
 59-picket-unpack-agenthost-dynamic-imports.patch
+60-picket-unpack-cjs-interop-chain.patch
