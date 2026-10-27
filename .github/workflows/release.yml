@@ -169,3 +169,41 @@ jobs:
             artifacts/SHA256SUMS
           prerelease: ${{ github.event.inputs.pre_release == 'true' }}
           generate_release_notes: true
+
+  # Sync final artifacts to Cloudflare R2 as stable "latest" links. The R2 bucket
+  # holds exactly the current release only: rclone sync removes any previous
+  # objects, so https://<bucket-domain>/picket-code-win32-x64.zip always points
+  # to the newest build. Secrets: R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT.
+  r2-sync:
+    name: Sync to Cloudflare R2 (latest only)
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install rclone
+        run: |
+          curl -fsSL -o rclone.deb https://downloads.rclone.org/rclone-current-linux-amd64.deb
+          sudo dpkg -i rclone.deb
+          rclone version
+
+      - name: Sync release artifacts to R2 (keep latest only)
+        run: |
+          mkdir -p release
+          cp artifacts/picket-code-win32-x64.zip release/
+          cp artifacts/picket-code-linux-x64.tar.gz release/
+          cp artifacts/SHA256SUMS release/
+          rclone sync release/ r2:picket-releases/ --progress
+
+      - name: Verify R2 objects
+        run: rclone lsl r2:picket-releases/
