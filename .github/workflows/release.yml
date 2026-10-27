@@ -31,11 +31,21 @@ jobs:
       - name: Resolve versions (vscode tag, node from upstream .nvmrc)
         id: versions
         shell: bash
+        env:
+          # The anonymous api.github.com limit (60 req/h, shared runner IPs) made this
+          # step fail with 403 on tag pushes. Tag pushes no longer touch the API at all;
+          # the token only covers the "latest stable" lookup for manual runs.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -n "${{ github.event.inputs.vscode_version }}" ]; then
             VSCODE_TAG="${{ github.event.inputs.vscode_version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            # Release tags are named after the upstream VS Code version (v1.143.1, or
+            # v1.143.1-p5 for the retired pre-releases): strip "v" and any "-pN" suffix.
+            VSCODE_TAG="${GITHUB_REF_NAME#v}"
+            VSCODE_TAG="${VSCODE_TAG%%-p*}"
           else
-            VSCODE_TAG="$(curl -fsSL https://api.github.com/repos/microsoft/vscode/releases/latest | python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"])')"
+            VSCODE_TAG="$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/microsoft/vscode/releases/latest | python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"])')"
           fi
           VSCODE_TAG="$(printf '%s' "$VSCODE_TAG" | tr -d '[:space:]')"
           echo "vscode=$VSCODE_TAG" >> "$GITHUB_OUTPUT"
