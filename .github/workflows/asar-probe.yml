@@ -1,0 +1,149 @@
+name: asar probe (manual)
+
+# 一次性诊断用：验证「Node 内部 package.json 读取能否看见 node_modules.asar」，
+# 并验证「只把 **/package.json 解包出去」是否足以修复。
+# 只读 GitHub Release 里已发布的产物，不修改产品代码。
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要探测的 release tag
+        default: v1.143.1
+        required: true
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Download and unpack the published win32 build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" `
+            --pattern "picket-code-win32-x64.zip" --dir . --clobber
+          Expand-Archive picket-code-win32-x64.zip -DestinationPath pkg -Force
+          $app = Join-Path $PWD "pkg\resources\app"
+          $names = (Get-ChildItem $app -Force | Select-Object -ExpandProperty Name) -join ', '
+          "asar size: {0:N0} bytes" -f (Get-Item "$app\node_modules.asar").Length
+          "resources/app entries: $names"
+          "asar.unpacked present: $(Test-Path "$app\node_modules.asar.unpacked")"
+
+      - name: Write probe script
+        shell: pwsh
+        run: |
+          $js = @'
+          'use strict';
+          const path = require('path');
+          const Module = require('module');
+
+          const app = process.cwd();
+          const nm = path.join(app, 'node_modules');
+
+          // Replicate src/bootstrap-node.ts: splice node_modules.asar into lookup paths.
+          const orig = Module._resolveLookupPaths;
+          Module._resolveLookupPaths = function (request, parent) {
+            const paths = orig(request, parent);
+            if (Array.isArray(paths)) {
+              for (let i = 0; i < paths.length; i++) {
+                if (paths[i] === nm) { paths.splice(i, 0, nm + '.asar'); break; }
+              }
+            }
+            return paths;
+          };
+
+          function probe(label, fn) {
+            try {
+              const r = fn();
+              console.log(`${label}: OK ${String(r).replace(app, '<app>')}`);
+            } catch (e) {
+              console.log(`${label}: FAIL code=${e.code} msg=${String(e.message).split('\n')[0]}`);
+            }
+          }
+
+          // A) CJS directory probe (bootstrap-node path -> _findPath -> _readPackage)
+          probe('cjs-resolve-tar', () => require.resolve('tar', { paths: [app] }));
+          probe('cjs-resolve-zod', () => require.resolve('zod', { paths: [app] }));
+
+          // B) exact call used by the ESM hook (src/bootstrap-esm.ts:97)
+          const asarRequire = Module.createRequire(path.join(nm + '.asar', 'x.js'));
+          probe('esm-asar-resolve-tar', () => asarRequire.resolve('./tar'));
+          probe('esm-asar-resolve-tar-pkgjson', () => asarRequire.resolve('./tar/package.json'));
+          probe('esm-asar-resolve-zod', () => asarRequire.resolve('./zod'));
+
+          // C) can module *source* still be read from a packed entry?
+          probe('cjs-load-packed-source', () => {
+            const p = require.resolve('katex', { paths: [app] });
+            const fs = require('fs');
+            return p + ' bytes=' + fs.readFileSync(p).length;
+          });
+          '@
+          Set-Content -Path probe.js -Encoding utf8 -Value $js
+
+      - name: "Probe 1: baseline (shipped asar)"
+        shell: pwsh
+        run: |
+          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          "exe: $exe"
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          Push-Location "pkg\resources\app"
+          Copy-Item "$PWD\..\..\..\probe.js" . -Force
+          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "pkg\resources\app\probe.js" -Force -ErrorAction SilentlyContinue }
+          "" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "### Probe 1 — shipped build" | Add-Content $env:GITHUB_STEP_SUMMARY
+          '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+          $out | Add-Content $env:GITHUB_STEP_SUMMARY
+          '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: "Probe 2: real app launch on the shipped build (scan logs)"
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $logs = "$env:APPDATA\Picket Code\logs"
+          Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $exe -ArgumentList '--verbose' -PassThru
+          Start-Sleep -Seconds 50
+          $hits = @()
+          if (Test-Path $logs) {
+            $hits = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+              Select-String -Pattern 'ERR_INVALID_PACKAGE_CONFIG|Invalid package config|Uncaught Exception|Could not locate the bindings file'
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          $summary = if ($hits) { $hits | ForEach-Object { "HIT: " + $_.Line.Trim() } } else { "no packaging errors in app logs" }
+          $summary
+          "### Probe 2 — real app (shipped build)" | Add-Content $env:GITHUB_STEP_SUMMARY
+          $summary | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: "Repack: unpack only **/package.json"
+        shell: pwsh
+        run: |
+          npm install -g @electron/asar --silent
+          $app = Join-Path $PWD "pkg\resources\app"
+          $work = Join-Path $PWD "repack"
+          Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+          asar extract "$app\node_modules.asar" $work
+          # put back the previously unpacked files so the tree is complete
+          Copy-Item "$app\node_modules.asar.unpacked\*" $work -Recurse -Force
+          Remove-Item "$app\node_modules.asar" -Force
+          Remove-Item "$app\node_modules.asar.unpacked" -Recurse -Force
+          asar pack $work "$app\node_modules.asar" --unpack "**/package.json"
+          "new asar: {0:N0} bytes; files kept outside: {1}" -f (Get-Item "$app\node_modules.asar").Length,
+            (Get-ChildItem "$app\node_modules.asar.unpacked" -Recurse -File | Measure-Object).Count
+
+      - name: "Probe 3: same probe against the repacked asar"
+        shell: pwsh
+        run: |
+          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          Push-Location "pkg\resources\app"
+          Copy-Item "$PWD\..\..\..\probe.js" . -Force
+          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "pkg\resources\app\probe.js" -Force -ErrorAction SilentlyContinue }
+          "" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "### Probe 3 — repacked (package.json outside, code inside)" | Add-Content $env:GITHUB_STEP_SUMMARY
+          '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+          $out | Add-Content $env:GITHUB_STEP_SUMMARY
+          '```' | Add-Content $env:GITHUB_STEP_SUMMARY
