@@ -93,6 +93,16 @@ jobs:
           });
           // E) 模块解析器内部的 _findPath（走原生 ReadPackageJSON）
           probe('findpath-asar', () => Module._findPath('katex', [nm + '.asar']));
+
+          // F) 三种路径写法：\\?\ 前缀 / 普通绝对 / 相对
+          const peek = (p) => {
+            const t = fs.readFileSync(p, 'utf8');
+            return JSON.stringify(t.slice(0, 40));
+          };
+          const plain = (nm + '.asar/katex/package.json').replace(/^\\\\\?\\/, '');
+          probe('fs-read-namespaced', () => peek('\\\\?\\' + plain.replace(/\//g, '\\')));
+          probe('fs-read-plain-abs', () => peek(plain));
+          probe('fs-read-relative', () => { process.chdir(app); return peek('node_modules.asar/katex/package.json'); });
           '@
           # probe.cjs —— app 目录的 package.json 是 "type": "module"，用 .js 会被当 ESM
           Set-Content -Path "$env:GITHUB_WORKSPACE\probe.cjs" -Encoding utf8 -Value $js
