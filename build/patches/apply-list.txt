@@ -8,8 +8,9 @@
 #   - 53-ext-copilot-remove-it.patch : ENABLED — Copilot/agentHost reference cleanup
 #     (28 modified + 2 deleted files), verified forward on a clean worktree.
 #   - 54-picket-code-disable-node-compile-cache.patch : ENABLED (build reproducibility)
-#   - 55 : ASAR unpack list, merged from the former 55-60 series into one hunk,
-#     so adding a module no longer depends on the previous patch's context.
+#   - 55 : RETIRED (file deleted). It unpacked 30 packages from node_modules.asar
+#     to dodge the writer race that patch 56 now fixes; upstream's 11-entry list
+#     is sufficient again, so `.asar.unpacked` stays small.
 #   - 56 : serialize `Filesystem.insertFile` in build/lib/asar.ts (asar 3.2.0
 #     hands concurrent inserts the same offset, which silently corrupts ~20% of
 #     the entries on the Windows build host; `tar/package.json` read back as a
@@ -21,9 +22,12 @@
 #     registrations that replace the Copilot-backed implementations.
 #   - 61 : build-script adaptations (dirs.ts / gulpfile filters, AppX + signtool
 #     tolerance, built-in extensions from GitHub). Supersedes patch-vscode.py.
+#   - 58 : `defaultAccount.ts` tolerates a build without `defaultChatAgent`
+#     (product.json no longer defines it, so no default-account provider is
+#     registered and the account UI keeps no dangling Copilot entry).
 53-ext-copilot-remove-it.patch
 54-picket-code-disable-node-compile-cache.patch
-55-picket-unpack-native-and-agenthost.patch
 56-asar-serialize-inserts.patch
 57-agenthost-remove-copilot-deps.patch
+58-agenthost-clean-product-config.patch
 61-build-source-adaptations.patch

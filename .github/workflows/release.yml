@@ -156,6 +156,33 @@ jobs:
           node build/check-asar.mjs \
             picket-code-${{ matrix.platform }}-${{ matrix.arch }}/resources/app/node_modules.asar
 
+      # The Copilot removal (patches 52/53) must not leave dangling product.json
+      # keys that point at extensions we do not ship: defaultChatAgent would make
+      # the account/chat UI offer a sign-in for a missing extension.
+      - name: Verify no account residues
+        shell: bash
+        run: |
+          app=picket-code-${{ matrix.platform }}-${{ matrix.arch }}/resources/app
+          fail=0
+          for key in defaultChatAgent trustedExtensionAuthAccess builtInExtensionsEnabledWithAutoUpdates; do
+            if grep -q "\"$key\"" "$app/product.json"; then
+              echo "RESIDUE: product.json still defines $key"
+              fail=1
+            fi
+          done
+          if grep -qiE 'github\.copilot|github-authentication|microsoft-authentication' "$app/product.json"; then
+            echo "RESIDUE: product.json still references a removed Copilot/auth extension"
+            fail=1
+          fi
+          for ext in github github-base github-authentication microsoft-authentication; do
+            if [ -d "$app/extensions/$ext" ]; then
+              echo "RESIDUE: extensions/$ext shipped"
+              fail=1
+            fi
+          done
+          if [ "$fail" -eq 0 ]; then echo "no account residues in the packaged app"; fi
+          exit $fail
+
       - name: Smoke test packaged app
         if: matrix.platform == 'win32'
         shell: pwsh

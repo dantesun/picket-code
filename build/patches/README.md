@@ -10,8 +10,9 @@ forward on a clean 1.143.1 tree.
 | `52-ext-copilot-remove-it.json` | JSON actions (physical removals) | **ENABLED** — 177/177 removal paths verified present on 1.143.1 and applied cleanly |
 | `53-ext-copilot-remove-it.patch` | git apply (reference cleanup, 30 files) | **ENABLED (rebase v2)** — 28 modified + 2 deleted files; still applies cleanly on 1.143.1 |
 | `54-picket-code-disable-node-compile-cache.patch` | git apply (build reproducibility) | **ENABLED** — `shouldGenerateNodeCompileCache` returns false (win32 EBUSY + nondeterministic cache output) |
-| `55-picket-unpack-native-and-agenthost.patch` | git apply (ASAR unpack list) | **ENABLED** — merges the former 55–60 series into one hunk (see below) |
+| ~~`55-picket-unpack-native-and-agenthost.patch`~~ | git apply (ASAR unpack list) | **RETIRED** — file deleted; patch 56 fixed the writer race those 30 unpack entries existed to dodge, so upstream's list is enough again |
 | `56-asar-serialize-inserts.patch` | git apply (ASAR writer fix) | **ENABLED** — serializes `Filesystem.insertFile`; `asar@3.2.0` records `this.offset` before awaiting the integrity hash, so concurrent inserts share an offset and ~20% of the archive reads back the wrong file |
+| `58-agenthost-clean-product-config.patch` | git apply (accounts, 1 file) | **ENABLED** — `defaultAccount.ts` tolerates a `product.json` without `defaultChatAgent`: it returns a neutral config and skips registering the default-account provider |
 | `57-agenthost-remove-copilot-deps.patch` | git apply (agent host DI seams, 7 files) | **ENABLED** — splits `copilotApiService.ts` into a Copilot-free `copilotApiTypes.ts` plus a dead `copilotApiServiceImpl.ts`, moves the local-model seam to `localModelSetupTypes.ts`, and registers the no-op `NoCopilotApiService` / `NoLocalModelSetupService`, so the agent host never loads `@vscode/copilot-api` or `@github/copilot-sdk` |
 | `61-build-source-adaptations.patch` | git apply (build script adaptations) | **ENABLED** — replaces `patch-vscode.py` (6 anchors, see below) |
 
@@ -68,7 +69,15 @@ applies cleanly with `git apply --ignore-whitespace --check`.
   config reads, `copilotBuiltinAgents.ts` (copilot dir, test-only import), comment in
   `agentSdkDownloader.ts`. All outside the esbuild bundle graph.
 
-## 55 — one ASAR unpack list instead of six patches (2026-10-27)
+## 55 — RETIRED (2026-10-28)
+
+The 30 unpack entries were a workaround for the ASAR writer race that patch 56 fixes.
+With the race gone the archive reads back correctly, so the list is back to upstream's
+11 entries and `.asar.unpacked` shrinks accordingly. The file is deleted; do not re-add
+entries here — if a package genuinely needs a real path, add a targeted entry with a
+comment explaining the non-corruption reason.
+
+## 55 (historical) — one ASAR unpack list instead of six patches (2026-10-27)
 
 The former `55-picket-unpack-policy-watcher` … `60-picket-unpack-cjs-interop-chain` series
 all appended entries to the same array in `build/gulpfile.vscode.ts` (`createAsar(...)`), so

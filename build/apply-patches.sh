@@ -34,7 +34,13 @@ import json, sys
 target, overlay = sys.argv[1], sys.argv[2]
 product = json.load(open(target, encoding='utf-8'))
 patch = json.load(open(overlay, encoding='utf-8'))
-product.update(patch)
+# A null in the overlay deletes the key from the upstream product.json; a plain
+# `update` would leave every key we do not override at its upstream value.
+for key, value in patch.items():
+    if value is None:
+        product.pop(key, None)
+    else:
+        product[key] = value
 with open(target, 'w', encoding='utf-8') as f:
     json.dump(product, f, indent=2, ensure_ascii=False)
     f.write('\n')
