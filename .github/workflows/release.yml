@@ -147,6 +147,38 @@ jobs:
         run: |
           bash build/${{ matrix.platform }}/package.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
 
+      # Guard for the asar writer race (build/patches/56): a mis-assigned offset
+      # makes one file read back as another, which is how `tar/package.json`
+      # ended up containing a LICENSE text and the agent host stopped starting.
+      - name: Verify asar layout
+        shell: bash
+        run: |
+          node build/check-asar.mjs \
+            picket-code-${{ matrix.platform }}-${{ matrix.arch }}/resources/app/node_modules.asar
+
+      - name: Smoke test packaged app
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE "picket-code-win32-x64"
+          $exe = (Get-ChildItem "$root\*.exe" | Where-Object {
+            $_.Name -notmatch 'ffmpeg|elevate|crashpad' } | Select-Object -First 1).FullName
+          $logs = "$env:APPDATA\Picket Code\logs"
+          Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $exe -ArgumentList '--verbose' -PassThru
+          Start-Sleep -Seconds 55
+          $hits = @()
+          if (Test-Path $logs) {
+            $hits = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+              Select-String -Pattern 'ERR_INVALID_PACKAGE_CONFIG|Invalid package config|Uncaught Exception|Could not locate the bindings file|Cannot find module'
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if ($hits) {
+            $hits | ForEach-Object { "HIT: " + $_.Line.Trim() }
+            exit 1
+          }
+          "no packaging errors in app logs"
+
       - name: Checksums
         shell: bash
         run: |

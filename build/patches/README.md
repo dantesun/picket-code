@@ -11,6 +11,7 @@ forward on a clean 1.143.1 tree.
 | `53-ext-copilot-remove-it.patch` | git apply (reference cleanup, 30 files) | **ENABLED (rebase v2)** — 28 modified + 2 deleted files; still applies cleanly on 1.143.1 |
 | `54-picket-code-disable-node-compile-cache.patch` | git apply (build reproducibility) | **ENABLED** — `shouldGenerateNodeCompileCache` returns false (win32 EBUSY + nondeterministic cache output) |
 | `55-picket-unpack-native-and-agenthost.patch` | git apply (ASAR unpack list) | **ENABLED** — merges the former 55–60 series into one hunk (see below) |
+| `56-asar-serialize-inserts.patch` | git apply (ASAR writer fix) | **ENABLED** — serializes `Filesystem.insertFile`; `asar@3.2.0` records `this.offset` before awaiting the integrity hash, so concurrent inserts share an offset and ~20% of the archive reads back the wrong file |
 | `61-build-source-adaptations.patch` | git apply (build script adaptations) | **ENABLED** — replaces `patch-vscode.py` (6 anchors, see below) |
 
 Source: https://github.com/VSCodium/vscodium/tree/master/patches (MIT). Picket Code applies
