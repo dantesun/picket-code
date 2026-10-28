@@ -80,6 +80,19 @@ jobs:
             const fs = require('fs');
             return p + ' bytes=' + fs.readFileSync(p).length;
           });
+
+          // D) 关键对比：JS 的 fs（Electron 的 asar 包装层）能不能读归档内文件？
+          const fs = require('fs');
+          probe('fs-read-asar-json', () => {
+            const t = fs.readFileSync(nm + '.asar/katex/package.json', 'utf8');
+            return 'bytes=' + t.length + ' name=' + JSON.parse(t).name;
+          });
+          probe('fs-stat-asar-pkgdir', () => {
+            const s = fs.statSync(nm + '.asar/katex');
+            return 'isDir=' + s.isDirectory();
+          });
+          // E) 模块解析器内部的 _findPath（走原生 ReadPackageJSON）
+          probe('findpath-asar', () => Module._findPath('katex', [nm + '.asar']));
           '@
           # probe.cjs —— app 目录的 package.json 是 "type": "module"，用 .js 会被当 ESM
           Set-Content -Path "$env:GITHUB_WORKSPACE\probe.cjs" -Encoding utf8 -Value $js
