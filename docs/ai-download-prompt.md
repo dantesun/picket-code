@@ -4,7 +4,7 @@
 
 ---
 
-【任务】请自动下载并安装 Picket Code v1.143.1（当前最新发行版）。
+【任务】请自动下载并安装 Picket Code v1.143.1-p1（当前最新发行版）。
 
 1. 下载对应平台的自动脚本（脚本会自动下载发行包并做 SHA256 校验）：
    - Windows PowerShell: https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.ps1

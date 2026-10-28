@@ -3,8 +3,8 @@ setlocal enabledelayedexpansion
 REM ============================================================
 REM  Picket Code download + SHA256 verify (Windows cmd)
 REM  Usage: download-verify.bat [TAG]
-REM  Example: download-verify.bat                  (default v1.143.1)
-REM           download-verify.bat v1.143.1
+REM  Example: download-verify.bat                  (default v1.143.1-p1)
+REM           download-verify.bat v1.143.1-p1
 REM
 REM  The default TAG below must match download-verify.sh,
 REM  download-verify.ps1 and docs/ai-download-prompt.md;
@@ -12,7 +12,7 @@ REM  build/check-contract.sh enforces that at build time.
 REM ============================================================
 
 set "TAG=%~1"
-if "%TAG%"=="" set "TAG=v1.143.1"
+if "%TAG%"=="" set "TAG=v1.143.1-p1"
 set "HOST=https://github.com/dantesun/picket-code"
 
 REM detect arch (win32-x64 is the current release; keep ARM compatible)
