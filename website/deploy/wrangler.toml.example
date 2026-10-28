@@ -1,0 +1,7 @@
+# Wrangler Pages 直传配置示例（备用方案，Git 接入则无需本文件）
+# 用法：wrangler pages deploy docs/.vitepress/dist --project-name=picket-code
+
+name = "picket-code"
+compatibility_date = "2026-01-01"
+
+pages_build_output_dir = "docs/.vitepress/dist"

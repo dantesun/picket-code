@@ -1,0 +1,40 @@
+# 示例：GitHub Actions 将官网部署到 Cloudflare Pages（直传方式）
+# 需要仓库 Secrets：
+#   CLOUDFLARE_API_TOKEN  —— Cloudflare API Token（Workers Scripts Edit / Pages Edit）
+#   CLOUDFLARE_ACCOUNT_ID —— Cloudflare 账户 ID
+# 与 Pages Git 接入二选一：Git 接入更简单（面板配置即可），本文件用于不想接 Git 的场景。
+
+name: Deploy site to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['website/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Build site
+        run: |
+          cd website
+          npm ci
+          npm run docs:build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy website/docs/.vitepress/dist --project-name=picket-code
