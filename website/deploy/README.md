@@ -2,7 +2,7 @@
 
 Picket Code 官网是纯静态站点（VitePress 构建产物），托管在 **Cloudflare Pages**，域名绑定 **noware.cn**，构建由 **GitHub** 触发。大文件（发行包、截图等）走 **R2** 存储。
 
-> **实际部署状态（2026-10-28，已完成）**：Pages 项目 `picket-code` 已创建并通过 Wrangler 直传上线，生产环境 `https://picket-code.pages.dev` 可访问；自定义域名 `picket-code.noware.cn` 已绑定并生效（状态 active），DNS CNAME 已创建（`picket-code → picket-code.pages.dev`，代理开启），SSL 由 Google Trust Services 签发（有效期至 2027-01-26）。
+> **实际部署状态（2026-10-28，Git 集成已完成）**：Pages 项目 `picket-code` 已接入 GitHub（`dantesun/picket-code`，production branch `main`），每次 push 到 `website/**` 自动构建上线；自定义域名 `picket-code.noware.cn` 已绑定并生效（active），SSL 由 Google Trust Services 签发（有效期至 2027-01-26）。构建配置：Root directory `website`，Build command `npm ci && npm run docs:build`，Output directory `docs/.vitepress/dist`。
 
 ## 总体架构
 
