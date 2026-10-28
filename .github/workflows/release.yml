@@ -157,7 +157,7 @@ jobs:
             picket-code-${{ matrix.platform }}-${{ matrix.arch }}/resources/app/node_modules.asar
 
       - name: Smoke test packaged app
-        if: matrix.platform == 'windows'
+        if: matrix.platform == 'win32'
         shell: pwsh
         run: |
           $root = Join-Path $env:GITHUB_WORKSPACE "picket-code-win32-x64"
