@@ -12,6 +12,7 @@ forward on a clean 1.143.1 tree.
 | `54-picket-code-disable-node-compile-cache.patch` | git apply (build reproducibility) | **ENABLED** — `shouldGenerateNodeCompileCache` returns false (win32 EBUSY + nondeterministic cache output) |
 | `55-picket-unpack-native-and-agenthost.patch` | git apply (ASAR unpack list) | **ENABLED** — merges the former 55–60 series into one hunk (see below) |
 | `56-asar-serialize-inserts.patch` | git apply (ASAR writer fix) | **ENABLED** — serializes `Filesystem.insertFile`; `asar@3.2.0` records `this.offset` before awaiting the integrity hash, so concurrent inserts share an offset and ~20% of the archive reads back the wrong file |
+| `57-agenthost-remove-copilot-deps.patch` | git apply (agent host DI seams, 7 files) | **ENABLED** — splits `copilotApiService.ts` into a Copilot-free `copilotApiTypes.ts` plus a dead `copilotApiServiceImpl.ts`, moves the local-model seam to `localModelSetupTypes.ts`, and registers the no-op `NoCopilotApiService` / `NoLocalModelSetupService`, so the agent host never loads `@vscode/copilot-api` or `@github/copilot-sdk` |
 | `61-build-source-adaptations.patch` | git apply (build script adaptations) | **ENABLED** — replaces `patch-vscode.py` (6 anchors, see below) |
 
 Source: https://github.com/VSCodium/vscodium/tree/master/patches (MIT). Picket Code applies
@@ -78,6 +79,40 @@ Regenerated against `1.143.1 + 52 + 53 + 54`; the resulting `gulpfile.vscode.ts`
 to applying 55–60 in sequence (verified by blob comparison). Adding a module is now a one-line
 edit to a single patch.
 
+## 57 — the agent host boots without the Copilot packages (2026-10-28)
+
+52 removes `@vscode/copilot-api` and `@github/copilot-sdk` from `package.json`, but the agent host still
+value-imported both at module-load time, so the process died with `MODULE_NOT_FOUND` before it served anything.
+Two chains mattered: `agentHostServices.ts` → `shared/copilotApiService.ts` → `@vscode/copilot-api`, and
+`agentHostServices.ts` → `copilot/localModelBridge/localModelSetupService.ts` → `shim/shimLocalModelProvider.ts`
+→ `shim/copilotRequestHandler.ts` → `@github/copilot-sdk`. The service decorators live inside those tainted
+modules, so every file injecting them re-triggered the chain — removing the registrations alone would not have
+been enough.
+
+The fix keeps the DI seams and drops only the transports:
+
+- `shared/copilotApiService.ts` is now a barrel over the new `shared/copilotApiTypes.ts`, which holds the
+  `ICopilotApiService` decorator, its interface, the request/telemetry types, `CopilotApiError`,
+  `COPILOT_API_ERROR_STATUS_STREAMING` and the `UTILITY_DEFAULT_*` constants. It imports nothing from the
+  Copilot packages, so every existing importer (utility model service, branch-name generator, proxy error
+  mapping, telemetry) keeps working unchanged. `CCAModel` is declared locally — a type-only import of the
+  package would not survive into the runtime graph, but keeping the file free of the package entirely is the
+  invariant this patch guarantees.
+- `shared/copilotApiServiceImpl.ts` receives the `CopilotApiService` class and keeps its
+  `@vscode/copilot-api` import. Nothing imports it in this build, so it is dead code that still type-checks;
+  it is the place to restore the backend if the packages ever return.
+- `copilot/localModelBridge/localModelSetupTypes.ts` holds the `ILocalModelSetupService` decorator, interface
+  and `NullLocalModelSetupService`; `localModelSetupService.ts` re-exports it for the existing test, and the
+  concrete `LocalModelSetupService` stays where it is.
+- `shared/noCopilotServices.ts` provides `NoCopilotApiService` (every method rejects with
+  `"[agentHost] <method> is unavailable: this build ships without the Copilot API."`) and
+  `NoLocalModelSetupService`. `agentHostServices.ts` registers those two instead of the Copilot-backed pair;
+  `IAgentHostHostServiceInputs.localModel` is left in place so callers did not have to change.
+
+Verification: patch applies cleanly to `1.143.1 + 52..56 + 61`; `tsc -p src/tsconfig.json` produces the exact
+same 591 pre-existing errors (missing `electron` typings and the removed Copilot/Claude/Codex sources) before
+and after the patch, and none in the touched files.
+
 ## 61 — build script adaptations, replacing patch-vscode.py (2026-10-27)
 
 `build/patch-vscode.py` did seven anchor replacements with a `str.replace()`; six of them are
@@ -103,8 +138,9 @@ a half-patched tree.
 ## Build order reminder
 
 52 alone removes the providers' sources, so a full compile FAILS until 53 (reference
-cleanup) is applied too. All five entries are in `apply-list.txt` and run in CI order
-`product.json merge → 52 → 53 → 54 → 55 → 61`.
+cleanup) is applied too, and the agent host only starts once 57 replaces the Copilot-backed
+services. All six entries are in `apply-list.txt` and run in CI order
+`product.json merge → 52 → 53 → 54 → 55 → 56 → 57 → 61`.
 
 ## Why Picket Code disables the node compile cache (54)
 

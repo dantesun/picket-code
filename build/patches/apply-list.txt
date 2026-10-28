@@ -14,10 +14,16 @@
 #     hands concurrent inserts the same offset, which silently corrupts ~20% of
 #     the entries on the Windows build host; `tar/package.json` read back as a
 #     LICENSE text and the agent host failed to start).
+#   - 57 : agent host boots without the Copilot packages. `copilotApiService.ts`
+#     splits into `copilotApiTypes.ts` (DI seam, no Copilot imports) and
+#     `copilotApiServiceImpl.ts` (dead in this build), `localModelSetupTypes.ts`
+#     holds the local-model seam, and `noCopilotServices.ts` supplies the no-op
+#     registrations that replace the Copilot-backed implementations.
 #   - 61 : build-script adaptations (dirs.ts / gulpfile filters, AppX + signtool
 #     tolerance, built-in extensions from GitHub). Supersedes patch-vscode.py.
 53-ext-copilot-remove-it.patch
 54-picket-code-disable-node-compile-cache.patch
 55-picket-unpack-native-and-agenthost.patch
 56-asar-serialize-inserts.patch
+57-agenthost-remove-copilot-deps.patch
 61-build-source-adaptations.patch
