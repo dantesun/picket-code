@@ -156,12 +156,10 @@ jobs:
           Copy-Item "$app\node_modules.asar.unpacked\*" $work -Recurse -Force
           Remove-Item "$app\node_modules.asar" -Force
           Remove-Item "$app\node_modules.asar.unpacked" -Recurse -Force
+          # 注意：重复的 --unpack 会被后一个覆盖，必须用花括号一次表达
           asar pack $work "$app\node_modules.asar" `
-            --unpack "**/package.json" `
-            --unpack "**/*.node" `
-            --unpack "**/*.wasm" `
-            --unpack "**/@vscode/vsce-sign/bin/**" `
-            --unpack "**/@vscode/ripgrep-universal/bin/**"
+            --unpack "**/{package.json,*.node,*.wasm}" `
+            --unpack-dir "**/{@vscode/vsce-sign,@vscode/ripgrep-universal}"
           "new asar: {0:N0} bytes; files kept outside: {1}" -f (Get-Item "$app\node_modules.asar").Length,
             (Get-ChildItem "$app\node_modules.asar.unpacked" -Recurse -File | Measure-Object).Count
           "outside sample: " + ((Get-ChildItem "$app\node_modules.asar.unpacked" -Recurse -File |
