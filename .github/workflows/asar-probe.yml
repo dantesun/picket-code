@@ -25,7 +25,6 @@ jobs:
           gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" `
             --pattern "picket-code-win32-x64.zip" --dir . --clobber
           Expand-Archive picket-code-win32-x64.zip -DestinationPath pkg -Force
-          # zip 里通常带一层顶层目录，这里自适应定位 resources\app
           $appDir = (Get-ChildItem pkg -Recurse -Directory -Filter app |
             Where-Object { $_.FullName -match 'resources\\app$' } | Select-Object -First 1).FullName
           $root = Split-Path (Split-Path $appDir -Parent) -Parent
@@ -34,9 +33,8 @@ jobs:
           "root: $root"
           "asar size: {0:N0} bytes" -f (Get-Item (Join-Path $appDir 'node_modules.asar')).Length
           "resources/app entries: " + ((Get-ChildItem $appDir -Force | Select-Object -ExpandProperty Name) -join ', ')
-          "asar.unpacked present: $(Test-Path (Join-Path $appDir 'node_modules.asar.unpacked'))"
 
-      - name: Write probe script
+      - name: Write probe script and runner helper
         shell: pwsh
         run: |
           $js = @'
@@ -47,7 +45,8 @@ jobs:
           const app = process.cwd();
           const nm = path.join(app, 'node_modules');
 
-          // Replicate src/bootstrap-node.ts: splice node_modules.asar into lookup paths.
+          console.log('probe: electron=' + process.versions.electron + ' node=' + process.versions.node);
+
           const orig = Module._resolveLookupPaths;
           Module._resolveLookupPaths = function (request, parent) {
             const paths = orig(request, parent);
@@ -68,17 +67,14 @@ jobs:
             }
           }
 
-          // A) CJS directory probe (bootstrap-node path -> _findPath -> _readPackage)
           probe('cjs-resolve-tar', () => require.resolve('tar', { paths: [app] }));
           probe('cjs-resolve-zod', () => require.resolve('zod', { paths: [app] }));
 
-          // B) exact call used by the ESM hook (src/bootstrap-esm.ts:97)
           const asarRequire = Module.createRequire(path.join(nm + '.asar', 'x.js'));
           probe('esm-asar-resolve-tar', () => asarRequire.resolve('./tar'));
           probe('esm-asar-resolve-tar-pkgjson', () => asarRequire.resolve('./tar/package.json'));
           probe('esm-asar-resolve-zod', () => asarRequire.resolve('./zod'));
 
-          // C) can module *source* still be read from a packed entry?
           probe('cjs-load-packed-source', () => {
             const p = require.resolve('katex', { paths: [app] });
             const fs = require('fs');
@@ -87,15 +83,31 @@ jobs:
           '@
           Set-Content -Path "$env:GITHUB_WORKSPACE\probe.js" -Encoding utf8 -Value $js
 
+          $helper = @'
+          param([string]$OutName)
+          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate|crashpad' } | Select-Object -First 1).FullName
+          "exe: $exe"
+          Copy-Item "$env:GITHUB_WORKSPACE\probe.js" "$env:APP_DIR\probe.js" -Force
+          $out = "$env:GITHUB_WORKSPACE\$OutName.out"
+          $err = "$env:GITHUB_WORKSPACE\$OutName.err"
+          $env:ELECTRON_RUN_AS_NODE = '1'
+          $p = Start-Process -FilePath $exe -ArgumentList 'probe.js' -WorkingDirectory $env:APP_DIR `
+            -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
+          "exit code: $($p.ExitCode)"
+          "--- stdout ---"
+          Get-Content $out -ErrorAction SilentlyContinue
+          "--- stderr ---"
+          Get-Content $err -ErrorAction SilentlyContinue
+          Remove-Item "$env:APP_DIR\probe.js" -Force -ErrorAction SilentlyContinue
+          '@
+          Set-Content -Path "$env:GITHUB_WORKSPACE\run-probe.ps1" -Encoding utf8 -Value $helper
+
       - name: "Probe 1: baseline (shipped asar)"
         shell: pwsh
+        continue-on-error: true
         run: |
-          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
-          "exe: $exe"
-          $env:ELECTRON_RUN_AS_NODE = '1'
-          Copy-Item "$env:GITHUB_WORKSPACE\probe.js" "$env:APP_DIR\probe.js" -Force
-          Push-Location $env:APP_DIR
-          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "$env:APP_DIR\probe.js" -Force -ErrorAction SilentlyContinue }
+          $ErrorActionPreference = 'Continue'
+          & "$env:GITHUB_WORKSPACE\run-probe.ps1" -OutName probe1 | Tee-Object -Variable out
           "### Probe 1 — shipped build" | Add-Content $env:GITHUB_STEP_SUMMARY
           '```' | Add-Content $env:GITHUB_STEP_SUMMARY
           $out | Add-Content $env:GITHUB_STEP_SUMMARY
@@ -105,8 +117,8 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
-          Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          $ErrorActionPreference = 'Continue'
+          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate|crashpad' } | Select-Object -First 1).FullName
           $logs = "$env:APPDATA\Picket Code\logs"
           Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $exe -ArgumentList '--verbose' -PassThru
@@ -117,20 +129,21 @@ jobs:
               Select-String -Pattern 'ERR_INVALID_PACKAGE_CONFIG|Invalid package config|Uncaught Exception|Could not locate the bindings file'
           }
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-          $summary = if ($hits) { $hits | ForEach-Object { "HIT: " + $_.Line.Trim() } } else { "no packaging errors in app logs" }
+          $summary = if ($hits) { $hits | ForEach-Object { "HIT: " + $_.Line.Trim() } } else { "no packaging errors in app logs (or app did not start)" }
           $summary
           "### Probe 2 — real app (shipped build)" | Add-Content $env:GITHUB_STEP_SUMMARY
           $summary | Add-Content $env:GITHUB_STEP_SUMMARY
 
-      - name: "Repack: unpack only **/package.json"
+      - name: "Repack: unpack only package.json"
         shell: pwsh
+        continue-on-error: true
         run: |
+          $ErrorActionPreference = 'Continue'
           npm install -g @electron/asar --silent
           $app = $env:APP_DIR
           $work = Join-Path $env:GITHUB_WORKSPACE "repack"
           Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
           asar extract "$app\node_modules.asar" $work
-          # 把原本就已解包的文件补回树里，保证内容完整
           Copy-Item "$app\node_modules.asar.unpacked\*" $work -Recurse -Force
           Remove-Item "$app\node_modules.asar" -Force
           Remove-Item "$app\node_modules.asar.unpacked" -Recurse -Force
@@ -140,12 +153,10 @@ jobs:
 
       - name: "Probe 3: same probe against the repacked asar"
         shell: pwsh
+        continue-on-error: true
         run: |
-          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
-          $env:ELECTRON_RUN_AS_NODE = '1'
-          Copy-Item "$env:GITHUB_WORKSPACE\probe.js" "$env:APP_DIR\probe.js" -Force
-          Push-Location $env:APP_DIR
-          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "$env:APP_DIR\probe.js" -Force -ErrorAction SilentlyContinue }
+          $ErrorActionPreference = 'Continue'
+          & "$env:GITHUB_WORKSPACE\run-probe.ps1" -OutName probe3 | Tee-Object -Variable out
           "### Probe 3 — repacked (package.json outside, code inside)" | Add-Content $env:GITHUB_STEP_SUMMARY
           '```' | Add-Content $env:GITHUB_STEP_SUMMARY
           $out | Add-Content $env:GITHUB_STEP_SUMMARY
