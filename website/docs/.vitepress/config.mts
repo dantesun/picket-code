@@ -8,6 +8,7 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg' }],
+    ['script', { src: '/analytics.js', defer: true }],
     ['meta', { name: 'theme-color', content: '#0b1220' }],
     ['meta', { property: 'og:title', content: 'Picket Code' }],
     [
