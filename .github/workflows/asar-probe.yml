@@ -25,11 +25,16 @@ jobs:
           gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" `
             --pattern "picket-code-win32-x64.zip" --dir . --clobber
           Expand-Archive picket-code-win32-x64.zip -DestinationPath pkg -Force
-          $app = Join-Path $PWD "pkg\resources\app"
-          $names = (Get-ChildItem $app -Force | Select-Object -ExpandProperty Name) -join ', '
-          "asar size: {0:N0} bytes" -f (Get-Item "$app\node_modules.asar").Length
-          "resources/app entries: $names"
-          "asar.unpacked present: $(Test-Path "$app\node_modules.asar.unpacked")"
+          # zip 里通常带一层顶层目录，这里自适应定位 resources\app
+          $appDir = (Get-ChildItem pkg -Recurse -Directory -Filter app |
+            Where-Object { $_.FullName -match 'resources\\app$' } | Select-Object -First 1).FullName
+          $root = Split-Path (Split-Path $appDir -Parent) -Parent
+          "PKG_ROOT=$root" | Add-Content $env:GITHUB_ENV
+          "APP_DIR=$appDir" | Add-Content $env:GITHUB_ENV
+          "root: $root"
+          "asar size: {0:N0} bytes" -f (Get-Item (Join-Path $appDir 'node_modules.asar')).Length
+          "resources/app entries: " + ((Get-ChildItem $appDir -Force | Select-Object -ExpandProperty Name) -join ', ')
+          "asar.unpacked present: $(Test-Path (Join-Path $appDir 'node_modules.asar.unpacked'))"
 
       - name: Write probe script
         shell: pwsh
@@ -80,18 +85,17 @@ jobs:
             return p + ' bytes=' + fs.readFileSync(p).length;
           });
           '@
-          Set-Content -Path probe.js -Encoding utf8 -Value $js
+          Set-Content -Path "$env:GITHUB_WORKSPACE\probe.js" -Encoding utf8 -Value $js
 
       - name: "Probe 1: baseline (shipped asar)"
         shell: pwsh
         run: |
-          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
           "exe: $exe"
           $env:ELECTRON_RUN_AS_NODE = '1'
-          Push-Location "pkg\resources\app"
-          Copy-Item "$PWD\..\..\..\probe.js" . -Force
-          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "pkg\resources\app\probe.js" -Force -ErrorAction SilentlyContinue }
-          "" | Add-Content $env:GITHUB_STEP_SUMMARY
+          Copy-Item "$env:GITHUB_WORKSPACE\probe.js" "$env:APP_DIR\probe.js" -Force
+          Push-Location $env:APP_DIR
+          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "$env:APP_DIR\probe.js" -Force -ErrorAction SilentlyContinue }
           "### Probe 1 — shipped build" | Add-Content $env:GITHUB_STEP_SUMMARY
           '```' | Add-Content $env:GITHUB_STEP_SUMMARY
           $out | Add-Content $env:GITHUB_STEP_SUMMARY
@@ -101,7 +105,7 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
           Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           $logs = "$env:APPDATA\Picket Code\logs"
           Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
@@ -122,11 +126,11 @@ jobs:
         shell: pwsh
         run: |
           npm install -g @electron/asar --silent
-          $app = Join-Path $PWD "pkg\resources\app"
-          $work = Join-Path $PWD "repack"
+          $app = $env:APP_DIR
+          $work = Join-Path $env:GITHUB_WORKSPACE "repack"
           Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
           asar extract "$app\node_modules.asar" $work
-          # put back the previously unpacked files so the tree is complete
+          # 把原本就已解包的文件补回树里，保证内容完整
           Copy-Item "$app\node_modules.asar.unpacked\*" $work -Recurse -Force
           Remove-Item "$app\node_modules.asar" -Force
           Remove-Item "$app\node_modules.asar.unpacked" -Recurse -Force
@@ -137,12 +141,11 @@ jobs:
       - name: "Probe 3: same probe against the repacked asar"
         shell: pwsh
         run: |
-          $exe = (Get-ChildItem "pkg\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
+          $exe = (Get-ChildItem "$env:PKG_ROOT\*.exe" | Where-Object { $_.Name -notmatch 'ffmpeg|elevate' } | Select-Object -First 1).FullName
           $env:ELECTRON_RUN_AS_NODE = '1'
-          Push-Location "pkg\resources\app"
-          Copy-Item "$PWD\..\..\..\probe.js" . -Force
-          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "pkg\resources\app\probe.js" -Force -ErrorAction SilentlyContinue }
-          "" | Add-Content $env:GITHUB_STEP_SUMMARY
+          Copy-Item "$env:GITHUB_WORKSPACE\probe.js" "$env:APP_DIR\probe.js" -Force
+          Push-Location $env:APP_DIR
+          try { & $exe probe.js 2>&1 | Tee-Object -Variable out } finally { Pop-Location; Remove-Item "$env:APP_DIR\probe.js" -Force -ErrorAction SilentlyContinue }
           "### Probe 3 — repacked (package.json outside, code inside)" | Add-Content $env:GITHUB_STEP_SUMMARY
           '```' | Add-Content $env:GITHUB_STEP_SUMMARY
           $out | Add-Content $env:GITHUB_STEP_SUMMARY
