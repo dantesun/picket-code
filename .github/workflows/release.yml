@@ -267,7 +267,7 @@ jobs:
             echo "vars.R2_PUBLIC_BASE_URL is not set, skipping mirror links"
             exit 0
           fi
-          gh release view "$GITHUB_REF_NAME" --json body --jq '.body // ""' > generated.md
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""' > generated.md
           {
             echo '## 下载地址'
             echo
@@ -293,7 +293,7 @@ jobs:
             echo
             cat generated.md
           } > notes.md
-          gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
 
   # Sync final artifacts to Cloudflare R2 as stable "latest" links. The R2 bucket
   # holds exactly the current release only: rclone sync removes any previous
