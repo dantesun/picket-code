@@ -2,7 +2,7 @@
 
 > Picket Code 只内置**最小必要**的扩展：降低攻击面、移除微软 / Copilot 相关组件与遥测、缩小发行体积，并且**默认离线**。
 
-数据来源：上游 `microsoft/vscode@1.142.0` 的 `extensions/`（97 个目录）与 `product.json` 的 `builtInExtensions`（3 个构建时下载的 JS 调试扩展）。
+数据来源：钉版上游 `microsoft/vscode@1.143.1` 的 `extensions/` 与 `product.json` 的 `builtInExtensions`（3 个构建时下载的 JS 调试扩展）。
 
 ## 决策原则
 
@@ -49,6 +49,15 @@
 | 冗余主题 | 9 | theme-monokai、theme-seti、theme-solarized-* 等 | 是 |
 
 > 语言语法类（含 SQL / Python）是否保留，按银行数据开发场景在发布前复核（见[设计总览](/architecture/overview)风险章节）。
+
+## 没有 GitHub / Microsoft 账号体系
+
+`github`、`github-base`、`github-authentication`、`microsoft-authentication` 被整体移除，`product.json` 也不再定义 `defaultChatAgent`、`trustedExtensionAuthAccess`、`builtInExtensionsEnabledWithAutoUpdates`。对扩展的实际影响：
+
+- 扩展调用 `authentication.getSession('github', ...)` 拿不到会话（没有可用的认证 provider），需要自行降级或提示未登录；
+- 依赖账号的特性不可用：Settings Sync、Publish to GitHub、GitHub 拉取请求 / Issues 集成、需要 Microsoft 账号的订阅类功能；
+- 不需要认证的路径照常工作：Git over HTTPS / SSH（凭据来自系统凭据管理器或 SSH agent）、Open VSX 安装、本地语言服务与调试；
+- CI 会断言 `extensions/` 与 `product.json` 中没有上述扩展和账号键，防止回潮。
 
 ## 受控市场（P0-3 规划）
 

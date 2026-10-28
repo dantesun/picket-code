@@ -14,7 +14,7 @@
 |---|---|---|
 | G1 | 干净二进制：无遥测、无微软品牌、无微软市场 | 产物反查无遥测端点与微软标识 |
 | G2 | 默认离线：不内置任何联网扩展 | 扩展最小集（32 保留 + 3 构建期） |
-| G3 | 无国外 agent：产物不含 Copilot / Claude / Codex 的 provider 与 SDK | 产物反查无三套 SDK 依赖 |
+| G3 | 无国外 agent：产物不含 Copilot / Claude / Codex 的 provider 与 SDK | 产物反查无三套 SDK 依赖；agent host 运行时 import 图不含 `@vscode/copilot-api` / `@github/copilot-sdk`（57 号） |
 | G4 | iCode 一等公民：AgentHost 注册 iCode，聊天面板可用 | P3 验证门：picker 出现 iCode，hello 往返成功 |
 | G5 | 合规内建：人工审批、审计日志、数据不出网 | 金发〔2026〕8号关键条款映射可追溯 |
 | G6 | 构建可重复：钉版 + 补丁体系 + CI 四段流水线 | L1 关键产物哈希一致（分级验收） |
@@ -59,9 +59,12 @@
 | `src/vs/platform/agentHost/node/` 编排器 | 保留 | 核心能力（providerService、sessionLifecycle、AHP） |
 | `src/vs/workbench/contrib/chat/.../agentHost/` 聊天 UI | 保留 | 属 workbench 核心，52/53 不碰 |
 | `node/copilot`、`node/claude`、`node/codex`、`node/otel`、`node/clientTools`、`common/otel` | 删除 | 复用 VSCodium 52 号清单（177 路径） |
-| 三套 SDK 依赖 + gulp copilot 任务 + product 注入 | 删除 | 复用 VSCodium 53 号补丁（26 文件） |
+| 三套 SDK 依赖 + gulp copilot 任务 + product 注入 | 删除 | 复用 VSCodium 53 号补丁（30 文件：28 修改 + 2 删除） |
 | `extensions/copilot` 前端扩展 | 删除 | 52 号清单整目录删除 |
+| 账号 UI 与 GitHub / Microsoft 登录 | 删除 | 构建剔除 `github`、`github-base`、`github-authentication`、`microsoft-authentication`；`product.json` 不再定义 `defaultChatAgent`、`trustedExtensionAuthAccess`、`builtInExtensionsEnabledWithAutoUpdates`（58 号让 `defaultAccount.ts` 容忍其缺失） |
 | 遥测 / 云 / 更新 / 登录 / 签名 / onboarding | 删除 | 复用 VSCodium 00/10/11/60/80 系列补丁 |
+
+**打包正确性**：`asar@3.2.0` 的 `Filesystem.insertFile` 在 await 完整性哈希**之前**记录 `this.offset`，并发插入因此拿到同一 offset——Windows 构建机上 3,765 个条目里有 751 个（约 20%）读回成别的文件，`tar/package.json` 返回一段 LICENSE 文本，agent host 启动时报 `ERR_INVALID_PACKAGE_CONFIG`。56 号补丁把插入串行化，CI 再用 `node build/check-asar.mjs` 解析产出的 `node_modules.asar` 断言布局；官方 VS Code 存在同一个潜伏竞态（其 Linux 构建机上约 0.1%）。原先为绕开该竞态而多解包 30 个包的清单已随之退役，解包清单回到上游的 11 条，`.asar.unpacked` 相应变小。
 
 ## 分阶段实施路线
 
@@ -75,11 +78,13 @@
 | P4 | 常驻 app-server | 多轮、工具审批、diff、中断全链路 |
 | P5 | UI / 分发与品牌 | 安装包无国外 agent 字节；双平台冒烟 |
 
+现状（2026-10-28）：P2 已完成——产物不含三套 SDK，agent host 在无 Copilot 包的情况下启动并说协议（57 号）；P2.5/P3 尚未验证，**发行版仍没有可用的 agent 后端**。
+
 ## 风险与未决问题
 
 | 风险 | 等级 | 缓解 |
 |---|---|---|
-| 53 号补丁跨 26 文件，上游重构引发 rebase 成本 | 中 | 钉版节奏固定；补丁锚点断言显式报错 |
+| 53 号补丁跨 30 文件，上游重构引发 rebase 成本 | 中 | 钉版节奏固定；补丁锚点断言显式报错 |
 | 内置聊天面板对非 copilot provider 兼容性未知 | 中 | P2.5 用 mockAgent 先验证 |
 | 扩展删除清单误删银行所需语言服务（SQL/Python） | 中 | 发布前按数据开发场景复核清单 |
 | 无头 run 硬编码绕过审批（上游机制） | 高 | Picket Code 配置层禁用；合同与部署规范双重约束 |

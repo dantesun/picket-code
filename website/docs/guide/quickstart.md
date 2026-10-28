@@ -2,7 +2,9 @@
 
 > 面向 AI 编码 agent 的加固版 VS Code 发行版——受控扩展、私有模型网关、按项目沙箱，开箱即用。
 
-Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版（fork），以干净、无遥测的二进制分发。它面向在可信、按项目隔离的环境中运行 AI 编码 agent 的团队，内置 [iCode](https://github.com/openJiuwen-ai/iCode) 作为唯一编码 agent——典型场景是银行 / 信创内网。
+Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版（fork），以干净、无遥测的二进制分发。它面向在可信、按项目隔离的环境中运行 AI 编码 agent 的团队，以 [iCode](https://github.com/openJiuwen-ai/iCode) 作为唯一 agent 方向——典型场景是银行 / 信创内网。
+
+> 当前发行版（v1.143.1-p1）**没有可用的 agent 后端**：AgentHost 已在不装 Copilot 包的情况下启动并说协议，但 iCode 适配层（P3–P4）尚未实现。
 
 ## 1. 下载
 
@@ -10,15 +12,15 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 
 | 平台 | 压缩包 | 启动方式 |
 |---|---|---|
-| Linux (x64) | `picket-code-linux-x64-<version>.tar.gz` | `./picket-code` |
-| Windows (x64) | `picket-code-win32-x64-<version>.zip` | `Picket Code.exe` |
+| Linux (x64) | `picket-code-linux-x64.tar.gz` | `./picket-code` |
+| Windows (x64) | `picket-code-win32-x64.zip` | `Picket Code.exe` |
 
 ## 2. 解压
 
 **Linux**
 
 ```bash
-tar -xzf picket-code-linux-x64-v1.143.1.tar.gz
+tar -xzf picket-code-linux-x64.tar.gz
 cd picket-code-linux-x64
 ```
 
@@ -38,15 +40,13 @@ Picket Code.exe
 
 无需安装、无需联网注册，核心编辑体验完全离线。
 
-## 4. 配置模型（F4）
+## 4. 配置模型（待后端接入）
 
-首次启动 iCode 时按 **F4** 添加模型配置：
+模型一律 BYO（自带），Picket Code 不内置任何模型服务：
 
-1. 按 `F4` 打开模型配置面板；
-2. 添加你的模型端点——推荐指向自托管网关（如 LiteLLM），让 agent 只访问你控制的端点；
-3. 保存后即可在聊天面板中使用 iCode。
-
-> 模型一律 BYO（自带），Picket Code 不内置任何模型服务。
+1. 规划中的入口：iCode 的模型配置面板（`F4`），可添加模型端点；
+2. 推荐指向自托管网关（如 LiteLLM），让 agent 只访问你控制的端点；
+3. **当前发行版尚无 agent 后端**（AgentHost 已就绪但无 `IAgent` 实现），模型配置要等 iCode 适配层（P3–P4）落地后才会真正生效。
 
 ## 5. 可选：启用按项目沙箱
 

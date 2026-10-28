@@ -1,6 +1,6 @@
 # AgentHost 与 iCode 集成
 
-> AgentHost 是 VS Code 内置的 agent 宿主平台：provider 注册、会话、审批、日志、AHP 传输。Picket Code 将其裁剪为"零 provider + 编排核心"，并注入 iCode 作为唯一 provider。
+> AgentHost 是 VS Code 内置的 agent 宿主平台：provider 注册、会话、审批、日志、AHP 传输。Picket Code 将其裁剪为"零 provider + 编排核心"：**当前构建能在完全不装 Copilot 包的情况下启动并说协议，但没有任何 `IAgent` 实现，因此还没有可用的 agent 后端。**
 
 ## AgentHost 关键事实（源码级）
 
@@ -11,13 +11,36 @@
 | 首个注册者自动成为默认 | `registerProvider()` | 注册 iCode 即默认 |
 | 注册门控模式 | Claude 用 env 开关 + SDK 可达性；Codex 用 env/配置 + SDK 可达性 | iCode 门控仿照：配置开关 + 二进制可达性 |
 
+## 零 Copilot 包启动（57 号补丁）
+
+52 号补丁把 `@vscode/copilot-api`、`@github/copilot-sdk` 从 `package.json` 中删掉，但 agent host 仍会在模块加载期 value-import 它们，进程在提供服务前就以 `MODULE_NOT_FOUND` 退出。57 号补丁保留 DI 缝、只摘掉传输实现：
+
+| 文件 | 角色 |
+|---|---|
+| `agentHost/node/shared/copilotApiTypes.ts` | `ICopilotApiService` 装饰器、接口、请求/遥测类型、`CopilotApiError`、`UTILITY_DEFAULT_*` 常量；不 import 任何 Copilot 包，现有调用方原样可用 |
+| `agentHost/node/shared/copilotApiServiceImpl.ts` | 原 `CopilotApiService` 实现，仍 import `@vscode/copilot-api`；本构建中无人 import，是可类型检查的死代码 |
+| `agentHost/node/shared/copilotApiService.ts` | 仅作为 `copilotApiTypes.ts` 的桶文件 |
+| `agentHost/node/copilot/localModelBridge/localModelSetupTypes.ts` | `ILocalModelSetupService` 装饰器、接口与 `NullLocalModelSetupService` |
+| `agentHost/node/shared/noCopilotServices.ts` | `NoCopilotApiService`（每个方法都以 `"... is unavailable: this build ships without the Copilot API."` 拒绝）与 `NoLocalModelSetupService`；由 `agentHostServices.ts` 注册 |
+
+结果：运行时 import 图中既没有 `@vscode/copilot-api`，也没有 `@github/copilot-sdk`。
+
+## 留给未来后端的扩展点
+
+- `IAgent`：agent 的内部接口（不是扩展 API），实现后交给 host 调度；
+- `IAgentHostProviderService.registerProvider()`：provider 注册入口，首个注册者成为默认；
+- `agentServiceFoundation.ts` 的 `providerConfigurations` 列表：声明内置 provider 及其门控；
+- `common/state/protocol/` 的协议客户端：host 与外部的 AHP 会话通道。
+
+现状：host 能启动、能说协议，**上述扩展点的 `IAgent` 实现尚未随发行版提供**，所以 picker 里没有可用 agent，聊天面板不会有真实会话。
+
 ## 52/53 复用方案
 
 - 下载 VSCodium `patches/52-ext-copilot-remove-it.json` 与 `53-ext-copilot-remove-it.patch`，随钉版固定；
 - **52 号**：177 条物理删除路径（含 80+ 测试文件），workbench 路径 0 条；
-- **53 号**：26 文件引用清理（provider 注册块整段删除、`providerConfigurations: []`、SDK 依赖删除、OTel 钩子 no-op）；
+- **53 号**：30 个文件（28 修改 + 2 删除）的引用清理——provider 注册块整段删除、`providerConfigurations: []`、SDK 依赖删除、OTel 钩子 no-op；
 - `mockAgent.ts` 在 53 中被就地裁剪后保留，作 iCode 适配器参考；
-- 落地状态（2026-10-27）：执行器 `build/apply-patches.sh` 是唯一补丁入口，顺序为 product.json merge → 52 → 53 → 54 → 55 → 61；在 vscode `1.143.1`（`e646868227c`）上实测 52 删除 177/177 路径、53/54/55/61 全部干净应用。
+- 落地状态（2026-10-28）：执行器 `build/apply-patches.sh` 是唯一补丁入口，顺序为 product.json merge → 52 → 53 → 54 → 56 → 57 → 58 → 61（55 号已退役：asar 写入竞态由 56 号修复，解包清单回到上游 11 条）；在 vscode `1.143.1`（`e646868227c`）上实测 52 删除 177/177 路径、其余补丁全部干净应用。
 
 ## iCode 适配器四件套（P3）
 
@@ -45,5 +68,5 @@ src/vs/platform/agentHost/node/icode/
 ## 聊天 UI 路线（已拍板）
 
 - agentHost 聊天面板在 **workbench 核心代码**（`agentHost.contribution.ts` 注册十几个 contribution，`AfterRestored` 阶段启动 host），不在 `extensions/copilot` 内；
-- 删除 copilot 扩展后，聊天 shell 仍在；iCode 注册后**可能直接渲染 iCode 会话**；
+- 删除 copilot 扩展后，聊天 shell 仍在；注册 provider 后**可能直接渲染该 provider 的会话**；
 - 决策：先用 **P2.5 验证核心面板直连**（用裁剪 mockAgent 注册 mock provider），通过则不引入外部 AHP client / 自建扩展；失败再评估替代路线。

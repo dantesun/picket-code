@@ -4,13 +4,13 @@ layout: home
 hero:
   name: Picket Code
   text: 面向 AI 编码 agent 的加固版 VS Code 发行版
-  tagline: 受控扩展 · 私有模型网关 · 按项目沙箱。默认离线、无遥测、iCode 一等公民 —— 为银行 / 信创内网而生的可信 IDE。
+  tagline: 受控扩展 · 私有模型网关 · 按项目沙箱。默认离线、无遥测、无账号绑定，AgentHost 为 iCode 预留一等接入点 —— 为银行 / 信创内网而生的可信 IDE。
   image:
     src: /logo.svg
     alt: Picket Code
   actions:
     - theme: brand
-      text: 下载 v1.143.1
+      text: 下载 v1.143.1-p1
       link: /guide/download
     - theme: alt
       text: 快速开始
@@ -23,7 +23,7 @@ hero:
 <div class="pc-section">
 
 <h2 class="pc-title">为什么需要 <span>Picket Code</span></h2>
-<p class="pc-sub">主流编码 agent 依赖公有云与国外服务，SDK 与遥测和信创内网的合规边界冲突且不可裁剪。Picket Code 以 Code - OSS 为基底，裁掉微软绑定与国外 agent 实现，内置 iCode 作为唯一编码 agent，形成"离线、可控、可审计"的内网 IDE 发行版。</p>
+<p class="pc-sub">主流编码 agent 依赖公有云与国外服务，SDK 与遥测和信创内网的合规边界冲突且不可裁剪。Picket Code 以 Code - OSS 为基底，裁掉微软绑定与国外 agent 实现，把 AgentHost 保留为干净的 agent 扩展点、以 iCode 作为唯一 agent 方向，形成"离线、可控、可审计"的内网 IDE 发行版。</p>
 
 <div class="pc-grid">
 
@@ -41,7 +41,7 @@ hero:
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5 4.5 9 2 11.5"/><path d="M12 6.5 9.5 9 12 11.5"/><path d="M7 3.5v11"/><path d="M14 8h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3"/></svg>
   </div>
   <h3>默认离线</h3>
-  <p>发行版不内置任何联网扩展：无 Copilot、无 GitHub 云集成、无认证 / 隧道 / 浏览器扩展，核心编辑体验完全离线。</p>
+  <p>发行版不内置任何联网扩展：无 Copilot、无 GitHub 云集成、无认证 / 隧道 / 浏览器扩展，核心编辑体验完全离线。也没有账号登录与设置同步：构建剔除了 github、github-base、github-authentication、microsoft-authentication 四个内置扩展，product.json 不再定义 defaultChatAgent 等账号键。</p>
   <span class="pc-tag">内置最小集 32 + 3</span>
 </div>
 
@@ -76,9 +76,9 @@ hero:
   <div class="pc-icon">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 4-3.5L13 8l4-3.5L21 8v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z"/><path d="M3 13h18"/><path d="M8 16.5h4"/></svg>
   </div>
-  <h3>iCode 一等公民</h3>
-  <p>内置 iCode 作为唯一编码 agent：BYO 模型、无遥测、OTel 就绪、支持 Workflows 与 Skills，不保留任何国外 agent 注册路径。</p>
-  <span class="pc-tag">P3–P4 推进中</span>
+  <h3>Agent 宿主就绪</h3>
+  <p>AgentHost 在完全不装 Copilot 包的情况下启动并说协议（57 号补丁），保留 IAgent、registerProvider、providerConfigurations 与协议客户端等扩展点；iCode 适配器尚未实现，当前发行版没有可用的 agent 后端。</p>
+  <span class="pc-tag">宿主可用 · 后端待接</span>
 </div>
 
 </div>
@@ -87,7 +87,7 @@ hero:
 <div class="pc-section">
 
 <h2 class="pc-title">分层架构 <span>To Be</span></h2>
-<p class="pc-sub">复用上游、减法优先：沿 VSCodium 验证过的构建路径做减法，先删后补。六层架构中，发行层与扩展层已落地，AgentHost 平台层裁剪为"零 provider + 编排核心"，iCode 经适配层接入。</p>
+<p class="pc-sub">复用上游、减法优先：沿 VSCodium 验证过的构建路径做减法，先删后补。六层架构中，发行层与扩展层已落地，AgentHost 平台层裁剪为"零 provider + 编排核心"且已在无 Copilot 包的情况下启动，iCode 经适配层接入（适配层待落地，当前发行版无可用 agent 后端）。</p>
 
 <div class="pc-stack">
   <div class="pc-stack-head">
@@ -143,7 +143,7 @@ hero:
 <div class="pc-section">
 
 <h2 class="pc-title">三步 <span>快速上手</span></h2>
-<p class="pc-sub">从下载到运行 AI 编码 agent，全程默认离线、无需联网注册。</p>
+<p class="pc-sub">从下载到启动编辑器，全程默认离线、无需联网注册（无账号、无登录）。</p>
 
 <div class="pc-steps">
   <div class="pc-step">
@@ -158,8 +158,8 @@ hero:
   </div>
   <div class="pc-step">
     <span class="pc-step-no">3</span>
-    <h3>F4 配置模型</h3>
-    <p>首次启动 iCode 时按 <code>F4</code> 添加模型配置，指向你的私有网关端点，开始编码。</p>
+    <h3>模型 BYO（待接入）</h3>
+    <p>模型一律自带（BYO），推荐指向自托管网关（如 LiteLLM）。当前发行版尚无 agent 后端，iCode 适配层（P3–P4）落地后模型配置才真正生效。</p>
   </div>
 </div>
 
@@ -177,7 +177,7 @@ hero:
       Linux (x64)
     </div>
     <ul>
-      <li>压缩包：<code>picket-code-linux-x64-&lt;version&gt;.tar.gz</code></li>
+      <li>压缩包：<code>picket-code-linux-x64.tar.gz</code>（不带版本号，版本由 Release 标签区分）</li>
       <li>启动：<code>./picket-code</code></li>
       <li><a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
@@ -188,7 +188,7 @@ hero:
       Windows (x64)
     </div>
     <ul>
-      <li>压缩包：<code>picket-code-win32-x64-&lt;version&gt;.zip</code></li>
+      <li>压缩包：<code>picket-code-win32-x64.zip</code>（不带版本号，版本由 Release 标签区分）</li>
       <li>启动：<code>Picket Code.exe</code></li>
       <li><a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
@@ -210,6 +210,7 @@ hero:
   <span class="pc-badge">扩展白名单 + 签名校验</span>
   <span class="pc-badge">默认拒绝出站沙箱</span>
   <span class="pc-badge">禁用无头审批绕过</span>
+  <span class="pc-badge">无账号 / 无登录 / 无设置同步</span>
   <span class="pc-badge">MIT 许可 · 供应链可审计</span>
 </div>
 
@@ -218,9 +219,9 @@ hero:
 <div class="pc-cta">
   <div class="pc-cta-box">
     <h2>开始使用 Picket Code</h2>
-    <p>下载 v1.143.1，或在 GitHub 上查看源码、提交 Issue、参与路线图。</p>
+    <p>下载 v1.143.1-p1，或在 GitHub 上查看源码、提交 Issue、参与路线图。</p>
     <div class="pc-cta-actions">
-      <a class="primary" href="/guide/download">下载 v1.143.1</a>
+      <a class="primary" href="/guide/download">下载 v1.143.1-p1</a>
       <a class="ghost" href="https://github.com/dantesun/picket-code">GitHub 仓库</a>
       <a class="ghost" href="/project/roadmap">查看路线图</a>
     </div>

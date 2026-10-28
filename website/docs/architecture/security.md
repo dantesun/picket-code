@@ -5,8 +5,16 @@
 ## 默认离线与无遥测
 
 - `product.json`：`removeTelemetry: true`、`enableTelemetry: false`、无微软品牌；
-- 内置扩展最小集：移除全部联网扩展（github、github-auth、tunnel、simple-browser、copilot、microsoft-auth）；
-- 验收口径：构建产物反查无遥测端点、无微软市场 URL、无微软登录相关字节。
+- 内置扩展最小集：移除全部联网扩展（`github`、`github-base`、`github-authentication`、`tunnel-forwarding`、`simple-browser`、`copilot`、`microsoft-authentication`）；
+- 验收口径：构建产物反查无遥测端点、无微软市场 URL、无微软登录相关字节；
+- 无 Copilot 包：agent host 的运行时 import 图既不含 `@vscode/copilot-api`，也不含 `@github/copilot-sdk`（57 号补丁；`CopilotApiService` 实现留在不被加载的 `copilotApiServiceImpl.ts`，注册的是 `noCopilotServices.ts` 里的 no-op 实现）。
+
+## 无账号、无登录
+
+- 构建剔除 `github`、`github-base`、`github-authentication`、`microsoft-authentication` 四个内置扩展；`product.json` 不再定义 `defaultChatAgent`、`trustedExtensionAuthAccess`、`builtInExtensionsEnabledWithAutoUpdates`（58 号让 `defaultAccount.ts` 在缺少 `defaultChatAgent` 时返回中性配置，不再注册默认账号 provider）；
+- 后果：界面没有「登录 GitHub / Microsoft」，没有 Settings Sync，也没有 Publish to GitHub；需要 `github` session 的扩展拿不到任何会话，会自行降级或提示未登录；
+- 不受影响：Git over HTTPS / SSH 仍照常工作（凭据来自系统凭据管理器或 SSH agent，与应用内账号体系无关）；
+- CI 断言：内置扩展目录与 `product.json` 都不得残留上述扩展名与账号键，命中即失败。
 
 ## 金发〔2026〕8号 关键条款映射
 
