@@ -1,0 +1,49 @@
+name: bundle audit (manual)
+
+# One-off diagnostic: greps the compiled bundles of a published build for
+# property chains that would throw when `product.json` has no `defaultChatAgent`.
+# Minification keeps property names, so `defaultChatAgent.` without `?.` in a
+# bundle is a guaranteed TypeError. Read-only; touches no product code.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to audit
+        required: true
+        default: v1.143.1-p2
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download the published linux build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" \
+            --pattern "picket-code-*-linux-x64.tar.gz" --dir . --clobber
+          tar -xzf picket-code-*-linux-x64.tar.gz
+          ls picket-code-linux-x64/resources/app/out/vs/sessions | head
+
+      - name: Audit the bundles
+        run: |
+          set -uo pipefail
+          root=picket-code-linux-x64/resources/app/out
+          found=0
+          for f in $(find "$root" -name '*.js' -size +1k | sort); do
+            hits=$(grep -o -E '.{0,70}defaultChatAgent\.[A-Za-z]+.{0,30}' "$f" 2>/dev/null || true)
+            [ -n "$hits" ] || continue
+            echo "=== $f"
+            printf '%s\n' "$hits" | head -40
+            found=1
+          done
+          [ "$found" = 1 ] || echo "no defaultChatAgent property chain found in any bundle"
+
+      - name: Count occurrences per bundle
+        run: |
+          root=picket-code-linux-x64/resources/app/out
+          grep -rlc "defaultChatAgent" "$root" 2>/dev/null | while read -r f; do
+            printf '%-90s %s\n' "${f#$root/}" "$(grep -o 'defaultChatAgent' "$f" | wc -l)"
+          done | sort -k2 -nr | head -20
