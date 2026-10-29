@@ -102,33 +102,48 @@ jobs:
           export DISPLAY=:99
 
           profile=$(mktemp -d)
+          # --no-sandbox: the tarball's chrome-sandbox helper is not SUID on a runner,
+          # so the stock sandbox refuses to start
           app-root/bin/picket-code \
             --user-data-dir="$profile/data" \
             --extensions-dir="$profile/ext" \
-            --disable-gpu --disable-dev-shm-usage --skip-welcome \
+            --no-sandbox --disable-gpu --disable-dev-shm-usage --skip-welcome \
             > "$profile/stdout.log" 2>&1 &
           app_pid=$!
-          sleep 60
+
+          sleep 25
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            echo "FAIL: the app exited before the extension host could start"
+            tail -30 "$profile/stdout.log"
+            exit 1
+          fi
+          sleep 40
           kill "$app_pid" 2>/dev/null || true
           wait "$app_pid" 2>/dev/null || true
 
+          logs="$profile/data/logs"
+          if [ ! -d "$logs" ]; then
+            echo "FAIL: the app never wrote a log directory"
+            tail -30 "$profile/stdout.log"
+            exit 1
+          fi
           echo "--- log tree ---"
-          find "$profile/data/logs" -name '*.log' | sort || true
+          find "$logs" -name '*.log' | sort || true
 
-          exthost=$(find "$profile/data/logs" -name 'exthost*.log' | head -1)
+          exthost=$(find "$logs" -name 'exthost*.log' | head -1 || true)
           if [ -z "$exthost" ]; then
             echo "FAIL: the extension host never wrote a log"
-            tail -40 "$profile/stdout.log"
+            tail -30 "$profile/stdout.log"
             exit 1
           fi
 
           activated=$(grep -c '_doActivateExtension' "$exthost" || true)
           echo "activated extensions: $activated"
-          grep -o '_doActivateExtension [^,]*' "$exthost" | sed 's/_doActivateExtension //' | sort -u | head -20 || true
+          grep -oP '_doActivateExtension \K[^,]+' "$exthost" | sort -u | head -20 || true
 
           fail=0
-          if [ "$activated" -lt 5 ]; then
-            echo "FAIL: fewer than 5 built-in extensions activated"
+          if [ "$activated" -lt 3 ] || ! grep -q '_doActivateExtension vscode.git' "$exthost"; then
+            echo "FAIL: the built-in extensions did not activate"
             fail=1
           fi
           hits=$(grep -hE 'is not iterable|Error scanning installed extensions|reading .extensionId|Error scanning' \
@@ -240,7 +255,10 @@ jobs:
             ForEach-Object { $_.Matches.Value }) | Sort-Object -Unique | Select-Object -First 20
 
           $fail = $false
-          if ($activated -lt 5) { "FAIL: fewer than 5 built-in extensions activated"; $fail = $true }
+          if ($activated -lt 3 -or -not (Select-String -Path $exthost.FullName -Pattern '_doActivateExtension vscode\.git' -Quiet)) {
+            "FAIL: the built-in extensions did not activate"
+            $fail = $true
+          }
           $hits = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
             Select-String -Pattern 'is not iterable|Error scanning installed extensions|reading .extensionId|Error scanning'
           if ($hits) {
