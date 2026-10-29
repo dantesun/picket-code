@@ -328,7 +328,7 @@ jobs:
       # `copy`, never `sync`: the bucket now holds several versions, and older ones
       # are removed only by the explicit prune below.
       - name: Upload release artifacts to R2
-        run: rclone copy release/ r2:picket-releases/ --progress
+        run: rclone copy --s3-no-check-bucket release/ r2:picket-releases/ --progress
 
       - name: Prune R2 (keep 3 versions)
         run: bash .github/scripts/prune-r2.sh

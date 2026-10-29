@@ -92,6 +92,8 @@ jobs:
             gh release delete-asset "$TAG" "$legacy" --repo "$GITHUB_REPOSITORY" -y
           done < legacy-assets.txt
           gh release upload "$TAG" assets/picket-code-* --repo "$GITHUB_REPOSITORY" --clobber
+          # The unversioned checksum file has no replacement name of its own.
+          gh release delete-asset "$TAG" SHA256SUMS --repo "$GITHUB_REPOSITORY" -y || true
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
 
       - name: Refresh the mirror links in the release notes
@@ -110,8 +112,10 @@ jobs:
             rclone copyto "r2:picket-releases/$legacy" "r2:picket-releases/picket-code-${TAG}-${legacy#picket-code-}"
             rclone deletefile "r2:picket-releases/$legacy"
           done < legacy-assets.txt
-          # The checksum file is a few hundred bytes, so it is simply uploaded.
-          rclone copyto "assets/picket-code-${TAG}-SHA256SUMS" \
+          # The checksum file is a few hundred bytes, so it is simply uploaded. The
+          # storage credentials cannot create buckets, and rclone probes for one on
+          # single-file uploads unless told not to.
+          rclone copyto --s3-no-check-bucket "assets/picket-code-${TAG}-SHA256SUMS" \
             "r2:picket-releases/picket-code-${TAG}-SHA256SUMS"
           rclone deletefile r2:picket-releases/SHA256SUMS || true
           bash .github/scripts/prune-r2.sh
