@@ -31,6 +31,20 @@ while body.lstrip().startswith('## 下载地址'):
 	body = parts[1].lstrip('\n')
 p.write_text(body, encoding='utf-8')
 PY
+# GitHub's generated notes end with a compare link to the previous release tag.
+# That tag is gone once old releases are removed, so the link would 404: drop the
+# line when it points at a tag this repository no longer has.
+prev_tag="$(grep -oE '/compare/[^/]+\.\.\.' generated.md | head -1 | sed -E 's|/compare/||; s|\.\.\.$||' || true)"
+if [ -n "$prev_tag" ] && ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$prev_tag" >/dev/null 2>&1; then
+	echo "dropping the compare link: tag $prev_tag no longer exists"
+	python3 - <<'PY'
+import pathlib, re
+p = pathlib.Path('generated.md')
+body = p.read_text(encoding='utf-8')
+body = re.sub(r'\n*\*\*Full Changelog\*\*: [^\n]*\n?', '\n', body)
+p.write_text(body, encoding='utf-8')
+PY
+fi
 sums="picket-code-${tag}-SHA256SUMS"
 {
 	echo '## 下载地址'
