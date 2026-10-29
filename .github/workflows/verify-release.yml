@@ -97,7 +97,9 @@ jobs:
         run: |
           set -uo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb
+          # Electron's runtime deps plus xvfb: a bare runner cannot start the app
+          sudo apt-get install -y -qq xvfb \
+            libnss3 libxss1 libatk-bridge2.0-0 libgtk-3-0 libasound2t64 libgbm1 libxkbcommon0
           Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
           export DISPLAY=:99
 
@@ -113,8 +115,13 @@ jobs:
 
           sleep 25
           if ! kill -0 "$app_pid" 2>/dev/null; then
-            echo "FAIL: the app exited before the extension host could start"
-            tail -30 "$profile/stdout.log"
+            code=0
+            wait "$app_pid" || code=$?
+            echo "FAIL: the app exited before the extension host could start (exit $code)"
+            echo "--- app output ---"
+            cat "$profile/stdout.log" || true
+            echo "--- missing shared libraries ---"
+            ldd app-root/picket-code 2>/dev/null | grep 'not found' || echo none
             exit 1
           fi
           sleep 40
