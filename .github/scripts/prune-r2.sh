@@ -50,11 +50,17 @@ fi
 
 drop="$(printf '%s\n' "$versions" | head -n $((total - KEEP)))"
 
+# Compare the whole version, not a prefix: `picket-code-v1.143.1-` would also match
+# the v1.143.1-p1 and v1.143.1-p2 objects.
+object_version() {
+	printf '%s' "$1" | sed -E 's/^picket-code-(v[0-9]+\.[0-9]+\.[0-9]+(-p[0-9]+)?)-.*/\1/'
+}
+
 while read -r version; do
 	[ -n "$version" ] || continue
-	pattern="^picket-code-$(printf '%s' "$version" | sed 's/\./\\./g')-"
-	printf '%s\n' "$objects" | grep -E "$pattern" | while read -r object; do
+	printf '%s\n' "$objects" | while read -r object; do
 		[ -n "$object" ] || continue
+		[ "$(object_version "$object")" = "$version" ] || continue
 		if [ "$DRY_RUN" = "1" ]; then
 			echo "DRY-RUN delete $REMOTE$object"
 		else
