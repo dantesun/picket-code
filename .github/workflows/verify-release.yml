@@ -111,29 +111,29 @@ jobs:
             --extensions-dir="$profile/ext" \
             --no-sandbox --disable-gpu --disable-dev-shm-usage --skip-welcome \
             > "$profile/stdout.log" 2>&1 &
-          app_pid=$!
+          launcher=$!
 
-          sleep 25
-          if ! kill -0 "$app_pid" 2>/dev/null; then
-            code=0
-            wait "$app_pid" || code=$?
-            echo "FAIL: the app exited before the extension host could start (exit $code)"
+          # bin/picket-code hands off to the electron binary, so poll for the log
+          # directory instead of watching the launcher's pid
+          logs="$profile/data/logs"
+          for _ in $(seq 1 30); do
+            [ -d "$logs" ] && break
+            sleep 2
+          done
+          if [ ! -d "$logs" ]; then
+            echo "FAIL: the app never wrote a log directory within 60s"
             echo "--- app output ---"
             cat "$profile/stdout.log" || true
             echo "--- missing shared libraries ---"
             ldd app-root/picket-code 2>/dev/null | grep 'not found' || echo none
+            pkill -f 'out/main.js' || true
             exit 1
           fi
-          sleep 40
-          kill "$app_pid" 2>/dev/null || true
-          wait "$app_pid" 2>/dev/null || true
 
-          logs="$profile/data/logs"
-          if [ ! -d "$logs" ]; then
-            echo "FAIL: the app never wrote a log directory"
-            tail -30 "$profile/stdout.log"
-            exit 1
-          fi
+          # give the extension host time to activate the startup extensions
+          sleep 40
+          pkill -f 'out/main.js' || true
+          wait "$launcher" 2>/dev/null || true
           echo "--- log tree ---"
           find "$logs" -name '*.log' | sort || true
 
