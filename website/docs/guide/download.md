@@ -1,6 +1,6 @@
 # 下载与安装
 
-> 当前版本：**v1.143.1-p1**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本）；Gitee 仓库只镜像源码，不承载 Release 附件。
+> 当前版本：**v1.143.1-p1**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
 
 ## 版本标签与产物
 
@@ -56,7 +56,7 @@ Windows 上可用 `Get-FileHash .\picket-code-v1.143.1-p1-win32-x64.zip -Algorit
 ::: code-group
 
 ```powershell [PowerShell]
-powershell -NoProfile -ExecutionPolicy Bypass -Command '$f=(Join-Path $PWD "download-verify.ps1");$wc=New-Object System.Net.WebClient;$u1="https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.ps1";$u2="https://gitee.com/dsun/picket-code/raw/main/build/download-verify.ps1";try{$wc.DownloadFile($u1,$f)}catch{$wc.DownloadFile($u2,$f)};& $f'
+powershell -NoProfile -ExecutionPolicy Bypass -Command '$f=(Join-Path $PWD "download-verify.ps1");$wc=New-Object System.Net.WebClient;$wc.DownloadFile("https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.ps1",$f);& $f'
 ```
 
 ```cmd [CMD]
@@ -65,7 +65,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v
 
 :::
 
-- 脚本优先从 GitHub raw 拉取，失败改用 Gitee 镜像 raw（Gitee 只镜像源码，脚本可用、附件不在那里）。
+- 脚本从 GitHub raw 拉取（`main` 分支，永远是最新脚本）。
 - 脚本从 GitHub Releases 解析并下载产物；国内网络可改用上面的镜像直链。
 - WebClient 自动使用系统代理 + 当前 Windows 用户凭据，企业网络可直接下载。
 - 若代理要求单独账号密码：`powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -ProxyCredential (Get-Credential)`
@@ -73,17 +73,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v
 
 ### Linux（bash 单行）
 
-::: code-group
-
-```bash [GitHub]
+```bash
 curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.sh" -o dv.sh && bash dv.sh
 ```
-
-```bash [Gitee 镜像]
-curl -fSL "https://gitee.com/dsun/picket-code/raw/main/build/download-verify.sh" -o dv.sh && bash dv.sh
-```
-
-:::
 
 完成后程序位置：解压后目录下的 `bin/picket-code`。
 
@@ -115,7 +107,7 @@ Get-FileHash .\picket-code-v1.143.1-p1-win32-x64.zip -Algorithm SHA256
 ## 常见问题
 
 **Q：下载 GitHub 附件慢怎么办？**
-优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本回 GitHub Releases。脚本本身也可从 Gitee 源码镜像拉取，但发行包附件只存在 GitHub Releases 与镜像。
+优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本回 GitHub Releases。
 
 **Q：如何换版本？**
 把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p1`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本只在 GitHub Releases。

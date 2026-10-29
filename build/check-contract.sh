@@ -70,9 +70,10 @@ echo "ok: built-in extensions (js-debug) kept and fetched from GitHub"
 for f in download-verify.sh download-verify.ps1 download-verify.bat; do
   grep -q 'SHA256SUMS' "$SCRIPT_DIR/$f" || fail "$f no longer verifies against the release SHA256SUMS"
 done
-# Gitee mirrors the source only; a release-download URL there would 404.
-if grep -rq --exclude=check-contract.sh 'gitee\.com/[^ "]*releases/download' "$ROOT_DIR/build" "$ROOT_DIR/docs" "$ROOT_DIR/.github" 2>/dev/null; then
-  fail "a Gitee release-download URL is still referenced (Gitee hosts source only, no release assets)"
+# There is no source mirror any more: the repository and the releases live on GitHub,
+# so a Gitee URL anywhere would be a dead link.
+if grep -rqi --exclude=check-contract.sh 'gitee\.com' "$ROOT_DIR/build" "$ROOT_DIR/docs" "$ROOT_DIR/.github" "$ROOT_DIR/README.md" "$ROOT_DIR/website/docs" 2>/dev/null; then
+  fail "a gitee.com URL is still referenced"
 else
   echo "ok: artifacts fetched from GitHub Releases + verified against SHA256SUMS"
 fi

@@ -22,8 +22,6 @@
    - Windows PowerShell: https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.ps1
    - Windows cmd: https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.bat
    - Linux/macOS: https://raw.githubusercontent.com/dantesun/picket-code/main/build/download-verify.sh
-   若 GitHub 直连失败，改用 Gitee 源码镜像的同一路径（仅镜像源码，不含 Release 附件）：
-   https://gitee.com/dsun/picket-code/raw/main/build/download-verify.ps1
 4. 运行脚本（可选；不带版本参数时取最新 release，要指定版本就传参：Windows -Tag v1.143.1-p1，Linux/macOS 第一个参数 v1.143.1-p1）：
    - Windows: powershell -ExecutionPolicy Bypass -File download-verify.ps1
    - Linux/macOS: bash download-verify.sh
