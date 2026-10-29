@@ -67,7 +67,8 @@ jobs:
                 ;;
             esac
           done
-          sha256sum picket-code-${TAG}-* > picket-code-${TAG}-SHA256SUMS
+          sha256sum picket-code-${TAG}-*.zip picket-code-${TAG}-*.tar.gz \
+            > picket-code-${TAG}-SHA256SUMS
           cat picket-code-${TAG}-SHA256SUMS
           echo "--- legacy names ---"
           cat ../legacy-assets.txt || true
@@ -123,4 +124,6 @@ jobs:
 
       - name: Delete the defective v1.143.1 release
         if: ${{ !inputs.dry_run && inputs.delete_defective }}
-        run: gh release delete v1.143.1 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y
+        run: |
+          gh release delete v1.143.1 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y \
+            || echo "v1.143.1 is already gone"
