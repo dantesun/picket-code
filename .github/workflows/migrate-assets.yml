@@ -1,0 +1,116 @@
+name: Migrate release assets
+
+# One-off maintenance workflow: renames the assets of an already published
+# release to the versioned scheme (`picket-code-<tag>-<os>-<arch>.<ext>`), both on
+# GitHub and in the R2 mirror, without rebuilding anything. The binaries are
+# reused as they are; only names and the merged checksum file change.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to migrate (assets only)
+        required: true
+        default: v1.143.1-p1
+      dry_run:
+        description: Only print the planned changes
+        type: boolean
+        default: true
+      delete_defective:
+        description: Also delete the broken v1.143.1 release and tag
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    name: Rename assets to the versioned scheme
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install rclone
+        run: |
+          curl -fsSL -o rclone.deb https://downloads.rclone.org/rclone-current-linux-amd64.deb
+          sudo dpkg -i rclone.deb
+          rclone version
+
+      - name: Download current assets
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets \
+            --pattern 'picket-code-*' --pattern 'SHA256SUMS'
+          ls -l assets
+
+      - name: Rename to the versioned scheme
+        run: |
+          set -euo pipefail
+          cd assets
+          : > ../legacy-assets.txt
+          for f in picket-code-*; do
+            case "$f" in
+              picket-code-v*) echo "already versioned: $f" ;;
+              *)
+                mv "$f" "${f/picket-code-/picket-code-${TAG}-}"
+                echo "$f" >> ../legacy-assets.txt
+                ;;
+            esac
+          done
+          sha256sum picket-code-${TAG}-* > picket-code-${TAG}-SHA256SUMS
+          cat picket-code-${TAG}-SHA256SUMS
+          echo "--- legacy names ---"
+          cat ../legacy-assets.txt || true
+
+      - name: Plan
+        if: inputs.dry_run
+        run: |
+          set -euo pipefail
+          echo "DRY RUN — no change was made. Planned:"
+          echo "  github: delete $(tr '\n' ' ' < legacy-assets.txt) and upload:"
+          ls assets
+          echo "  r2: copy the same objects to versioned keys and drop the legacy ones:"
+          rclone lsf r2:picket-releases/
+
+      - name: Update GitHub release assets
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          while read -r legacy; do
+            [ -n "$legacy" ] || continue
+            echo "delete asset $legacy"
+            gh release delete-asset "$TAG" "$legacy" --repo "$GITHUB_REPOSITORY" -y
+          done < legacy-assets.txt
+          gh release upload "$TAG" assets/picket-code-* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'
+
+      - name: Update R2 mirror
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # Server-side copy: the archives are not downloaded again.
+          while read -r legacy; do
+            [ -n "$legacy" ] || continue
+            rclone copyto "r2:picket-releases/$legacy" "r2:picket-releases/picket-code-${TAG}-${legacy#picket-code-}"
+            rclone deletefile "r2:picket-releases/$legacy"
+          done < legacy-assets.txt
+          # The checksum file is a few hundred bytes, so it is simply uploaded.
+          rclone copyto "assets/picket-code-${TAG}-SHA256SUMS" \
+            "r2:picket-releases/picket-code-${TAG}-SHA256SUMS"
+          rclone deletefile r2:picket-releases/SHA256SUMS || true
+          bash .github/scripts/prune-r2.sh
+          rclone lsl r2:picket-releases/
+
+      - name: Delete the defective v1.143.1 release
+        if: ${{ !inputs.dry_run && inputs.delete_defective }}
+        run: gh release delete v1.143.1 --repo "$GITHUB_REPOSITORY" --cleanup-tag -y

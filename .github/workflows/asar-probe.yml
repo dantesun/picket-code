@@ -22,9 +22,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Assets are versioned: picket-code-<tag>-win32-x64.zip
           gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" `
-            --pattern "picket-code-win32-x64.zip" --dir . --clobber
-          Expand-Archive picket-code-win32-x64.zip -DestinationPath pkg -Force
+            --pattern "picket-code-*-win32-x64.zip" --dir . --clobber
+          $zip = (Get-ChildItem "picket-code-*-win32-x64.zip" | Select-Object -First 1).Name
+          Expand-Archive $zip -DestinationPath pkg -Force
           $appDir = (Get-ChildItem pkg -Recurse -Directory -Filter app |
             Where-Object { $_.FullName -match 'resources\\app$' } | Select-Object -First 1).FullName
           $root = Split-Path (Split-Path $appDir -Parent) -Parent

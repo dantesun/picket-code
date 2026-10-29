@@ -68,7 +68,7 @@
 | `build/linux/package.sh` | 解包 → 重命名 `VSCode-linux-<arch>` → `picket-code-linux-<arch>` → tar.gz | confirmed，已提交 main |
 | `build/win32/package.sh` | 解包 → 杀占用进程/清只读属性 → 带重试 mv → robocopy /MOVE 兜底 → 7z/tar/Compress-Archive 三级压缩 | confirmed，已提交 main（修复 Permission denied 根因） |
 | `.github/workflows/release.yml` | 四 job：versions（解版本）→ compile（linux/win32 matrix）→ package → release | confirmed，已提交 main |
-| `build/product.json` | 品牌（picket-code/Picket Code）、telemetry off、Open VSX 市场、updateUrl 指向本项目 Releases | confirmed |
+| `build/product.json` | 品牌（picket-code/Picket Code）、telemetry off、Open VSX 市场、移除 updateUrl（更新器自禁用，无更新服务） | confirmed |
 | `build/apply-patches.sh` | 三步执行器：① product.json merge（内嵌 python3）② `patches/52*.json` 路径删除（缺失即 exit 4）③ `patches/apply-list.txt` 逐个 `git apply` | confirmed |
 | `build/patches/61-build-source-adaptations.patch` | 构建脚本适配 6 处：copilot.ts 守卫改告警、npm/dirs.ts 过滤、gulpfile.extensions 过滤、lib/extensions 媒体过滤、AppX 跳过、signtool 缺失容忍，另加 `builtInExtensions.ts` 只走 GitHub 下载 | confirmed |
 | `build/extensions-remove.list` | 内置扩展最小集清单（保留 32 + 构建期 3，移除 65） | confirmed |

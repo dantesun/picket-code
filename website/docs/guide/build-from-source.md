@@ -28,7 +28,7 @@ bash build/linux/package.sh linux x64
 
 | 补丁 | 内容 |
 |---|---|
-| product.json merge（内嵌 python3） | 品牌 `picket-code / Picket Code`、`removeTelemetry: true`、Open VSX 市场、更新通道指向本项目 Releases；值为 `null` 的键从上游 `product.json` 中删除（`defaultChatAgent` 等） |
+| product.json merge（内嵌 python3） | 品牌 `picket-code / Picket Code`、`removeTelemetry: true`、Open VSX 市场、内置更新器关闭（`updateUrl` 置 `null` 后被删除，更新器以「no update URL」退出）；值为 `null` 的键从上游 `product.json` 中删除（`defaultChatAgent` 等） |
 | **52** JSON 删除 | copilot 全量删除（177 条物理路径，缺失即 exit 4 显式报错） |
 | **53** 引用清理 | Copilot 引用清理，30 个文件（28 修改 + 2 删除） |
 | **54** 禁用 node 编译缓存 | `shouldGenerateNodeCompileCache` 返回 false（win32 EBUSY + 缓存产物不确定） |
@@ -68,7 +68,7 @@ bash build/linux/package.sh linux x64
 
 ## 发行流水线
 
-推送 `v*` 标签（或手动 `workflow_dispatch`）触发 GitHub Actions 发行工作流，四段流水线：`versions → compile（linux / win32 矩阵）→ package → release`，随后 `r2-sync` 把资产镜像到 Cloudflare R2。详见[发行与版本](/guide/releases)。
+推送 `v*` 标签（或手动 `workflow_dispatch`）触发 GitHub Actions 发行工作流，四段流水线：`versions → compile（linux / win32 矩阵）→ package → release`，随后 `r2-sync` 用 `rclone copy` 把资产镜像到 Cloudflare R2 桶 `picket-releases`，再裁剪成只保留最近 3 个版本。详见[发行与版本](/guide/releases)。
 
 ## 目录速览
 
@@ -81,4 +81,4 @@ bash build/linux/package.sh linux x64
 | `build/check-asar.mjs` | CI 断言：解析产出的 `node_modules.asar`，检查条目偏移重叠 / 数据区错位 |
 | `build/extensions-remove.list` | 内置扩展最小集清单（保留 32 + 构建期 3，移除 65） |
 | `build/patches/` | 补丁文件与 `apply-list.txt`（55 已退役，文件已删除） |
-| `build/product.json` | 品牌、遥测开关、市场、更新通道 |
+| `build/product.json` | 品牌、遥测开关、市场、更新器开关（关闭） |

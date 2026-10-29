@@ -15,28 +15,25 @@ FAILED=0
 
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 
-# ---- 1. every downloader defaults to the same tag ----
-default_tag() {
-  case "$1" in
-    *.sh)  sed -n 's/^TAG="\${1:-\(v[0-9][^}]*\)}".*/\1/p' "$1" ;;
-    *.ps1) sed -n 's/^  \[string\]\$Tag = "\(v[0-9][^"]*\)",.*/\1/p' "$1" ;;
-    *.bat) sed -n 's/^if "%TAG%"=="" set "TAG=\(v[0-9][^"]*\)".*/\1/p' "$1" ;;
-  esac
-}
-
-REF_TAG=""
-for f in "$SCRIPT_DIR/download-verify.sh" "$SCRIPT_DIR/download-verify.ps1" "$SCRIPT_DIR/download-verify.bat"; do
-  tag="$(default_tag "$f")"
-  [ -n "$tag" ] || { fail "$(basename "$f"): no default tag found"; continue; }
-  if [ -z "$REF_TAG" ]; then
-    REF_TAG="$tag"
-  elif [ "$tag" != "$REF_TAG" ]; then
-    fail "$(basename "$f") defaults to $tag, download-verify.sh defaults to $REF_TAG"
-  fi
+# ---- 1. every downloader derives the artifact name from the tag ----
+# Artifacts are versioned (`picket-code-<tag>-<os>-<arch>.<ext>`) and the tag is
+# resolved from the latest release when it is not passed. A downloader that still
+# builds an unversioned name would 404 on the mirror and on GitHub.
+for pair in "download-verify.sh:picket-code-\$TAG-" \
+            "download-verify.ps1:picket-code-\$Tag-" \
+            "download-verify.bat:picket-code-%TAG%-"; do
+  f="${pair%%:*}"
+  pattern="${pair#*:}"
+  grep -qF -- "${pattern//\\/}" "$SCRIPT_DIR/$f" \
+    || fail "$f: archive name is not derived from the tag"
+  grep -q 'releases/latest' "$SCRIPT_DIR/$f" \
+    || fail "$f: does not resolve the latest release when no tag is given"
 done
-PROMPT_TAG="$(grep -oE 'v[0-9][0-9.]*(-p[0-9][0-9]*)?' "$ROOT_DIR/docs/ai-download-prompt.md" | head -1 || true)"
-[ "$PROMPT_TAG" = "$REF_TAG" ] || fail "docs/ai-download-prompt.md says ${PROMPT_TAG:-nothing}, downloaders default to $REF_TAG"
-echo "ok: default tag $REF_TAG (3 downloaders + ai-download-prompt.md)"
+if grep -qE 'releases/download/v[0-9]+\.[0-9]+\.[0-9]+' "$ROOT_DIR/docs/ai-download-prompt.md" \
+   || grep -qE 'releases/download/v[0-9]+\.[0-9]+\.[0-9]+' "$ROOT_DIR/docs/download-one-liner.md"; then
+  fail "docs/ still pin a release tag; the downloaders resolve the latest release instead"
+fi
+echo "ok: downloaders derive versioned names and resolve the latest tag"
 
 # ---- 2. archive layout promised by the docs matches the packaging scripts ----
 layout_ok=1

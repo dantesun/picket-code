@@ -147,6 +147,19 @@ jobs:
         run: |
           bash build/${{ matrix.platform }}/package.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
 
+      # The archives leave package.sh under a version-less name so the checks below
+      # can address one stable directory. Published files, however, carry the tag:
+      # mirror URLs stay immutable, so they can be cached forever and three versions
+      # can coexist without sharing names.
+      - name: Version the artifacts
+        shell: bash
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          for f in picket-code-${{ matrix.platform }}-${{ matrix.arch }}.*; do
+            mv "$f" "${f/picket-code-/picket-code-${GITHUB_REF_NAME}-}"
+          done
+          ls -l picket-code-*
+
       # Guard for the asar writer race (build/patches/56): a mis-assigned offset
       # makes one file read back as another, which is how `tar/package.json`
       # ended up containing a LICENSE text and the agent host stopped starting.
@@ -180,6 +193,13 @@ jobs:
               fail=1
             fi
           done
+          # We have no update server: the stock Windows updater would ask GitHub's
+          # releases page for update metadata and log "Server returned 404" on every
+          # start. Without updateUrl it disables itself (abstractUpdateService.ts).
+          if grep -q '"updateUrl"' "$app/product.json"; then
+            echo "RESIDUE: product.json still defines updateUrl"
+            fail=1
+          fi
           if [ "$fail" -eq 0 ]; then echo "no account residues in the packaged app"; fi
           exit $fail
 
@@ -210,9 +230,9 @@ jobs:
         shell: bash
         run: |
           cd "$GITHUB_WORKSPACE"
-          # One file per matrix job: a plain SHA256SUMS would be overwritten by the other
-          # job when the artifacts are merged with `merge-multiple`.
-          sha256sum picket-code-${{ matrix.platform }}-${{ matrix.arch }}.* \
+          # One file per matrix job: a plain checksum file would be overwritten by the
+          # other job when the artifacts are merged with `merge-multiple`.
+          sha256sum picket-code-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.* \
             > SHA256SUMS-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Upload picket-code artifacts
@@ -220,7 +240,7 @@ jobs:
         with:
           name: picket-code-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            picket-code-${{ matrix.platform }}-${{ matrix.arch }}.*
+            picket-code-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.*
             SHA256SUMS-${{ matrix.platform }}-${{ matrix.arch }}
           if-no-files-found: error
 
@@ -245,17 +265,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat artifacts/SHA256SUMS-* > artifacts/SHA256SUMS
-          cat artifacts/SHA256SUMS
+          cat artifacts/SHA256SUMS-* > "artifacts/picket-code-${{ github.ref_name }}-SHA256SUMS"
+          cat "artifacts/picket-code-${{ github.ref_name }}-SHA256SUMS"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           # Publish only final deliverables; drop build intermediates (vscode.tar.gz).
+          # The versioned names (archives + checksums) all start with `picket-code-`.
           files: |
             artifacts/picket-code-*
-            artifacts/SHA256SUMS
           prerelease: ${{ github.event.inputs.pre_release == 'true' }}
           generate_release_notes: true
 
@@ -274,24 +294,25 @@ jobs:
             exit 0
           fi
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""' > generated.md
+          sums="picket-code-${GITHUB_REF_NAME}-SHA256SUMS"
           {
             echo '## 下载地址'
             echo
-            echo "镜像（只保留当前版，国内访问更快）：$base"
+            echo "镜像（保留最近 3 个版本，国内访问更快）：$base"
             echo
             echo '| 平台 | 下载 |'
             echo '| --- | --- |'
-            gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name' |
+            gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
               grep -E '^picket-code-.*\.(zip|tar\.gz)$' | sort | while read -r asset; do
-                label="${asset#picket-code-}"
+                label="${asset#picket-code-${GITHUB_REF_NAME}-}"
                 label="${label%.tar.gz}"
                 label="${label%.zip}"
                 echo "| $label | $base/$asset |"
               done
-            echo "| 校验和 | $base/SHA256SUMS |"
+            echo "| 校验和 | $base/$sums |"
             echo
             echo '```bash'
-            echo "curl -fSL $base/SHA256SUMS -o SHA256SUMS"
+            echo "curl -fSL $base/$sums -o SHA256SUMS"
             echo 'sha256sum -c --ignore-missing SHA256SUMS'
             echo '```'
             echo
@@ -301,12 +322,12 @@ jobs:
           } > notes.md
           gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
 
-  # Sync final artifacts to Cloudflare R2 as stable "latest" links. The R2 bucket
-  # holds exactly the current release only: rclone sync removes any previous
-  # objects, so https://<bucket-domain>/picket-code-win32-x64.zip always points
-  # to the newest build. Secrets: R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT.
+  # Mirror the published artifacts to Cloudflare R2. Files keep their versioned
+  # names, so a URL never changes meaning; the prune step keeps the newest three
+  # versions and drops older ones. Secrets: R2_ACCESS_KEY_ID /
+  # R2_SECRET_ACCESS_KEY / R2_ENDPOINT.
   r2-sync:
-    name: Sync to Cloudflare R2 (latest only)
+    name: Sync to Cloudflare R2 (keep 3 versions)
     needs: release
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -318,15 +339,19 @@ jobs:
       RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
     steps:
       # Take the assets from the published release rather than from the run artifacts:
-      # SHA256SUMS only exists there (it is merged inside the release job), and the
-      # pattern picks up whatever platforms the matrix produced.
+      # the merged checksum file only exists there, and the pattern picks up whatever
+      # platforms the matrix produced.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
       - name: Download published assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release
           gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir release \
-            --pattern 'picket-code-*' --pattern 'SHA256SUMS'
+            --pattern 'picket-code-*'
           ls -l release
 
       - name: Install rclone
@@ -335,8 +360,13 @@ jobs:
           sudo dpkg -i rclone.deb
           rclone version
 
-      - name: Sync release artifacts to R2 (keep latest only)
-        run: rclone sync release/ r2:picket-releases/ --progress
+      # `copy`, never `sync`: the bucket now holds several versions, and older ones
+      # are removed only by the explicit prune below.
+      - name: Upload release artifacts to R2
+        run: rclone copy release/ r2:picket-releases/ --progress
+
+      - name: Prune R2 (keep 3 versions)
+        run: bash .github/scripts/prune-r2.sh
 
       - name: Verify R2 objects
         run: rclone lsl r2:picket-releases/

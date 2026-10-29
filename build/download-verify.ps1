@@ -12,13 +12,13 @@
   .\download-verify.ps1 -Tag v1.143.1-p1 -OutDir D:\Downloads
   .\download-verify.ps1 -ProxyCredential (Get-Credential)
 .NOTES
-  默认 Tag 需与 download-verify.sh / download-verify.bat /
-  docs/ai-download-prompt.md 保持一致（build/check-contract.sh 会校验）。
+  不带 -Tag 时自动使用 GitHub 上最新的 release；产物名为
+  picket-code-<tag>-<os>-<arch>.<ext>，校验和文件为 picket-code-<tag>-SHA256SUMS。
   本文件必须保存为 UTF-8 with BOM：Windows PowerShell 5.1 对无 BOM 的脚本按系统 ANSI
   代码页解析，中文字符会破坏字符串字面量并直接报语法错误。
 #>
 param(
-  [string]$Tag = "v1.143.1-p1",
+  [string]$Tag = "",
   [string]$Repo = "dantesun/picket-code",
   [string]$OutDir = (Get-Location).Path,
   [pscredential]$ProxyCredential
@@ -31,7 +31,19 @@ $os = if ($win) { "win32" } elseif ($IsLinux) { "linux" } elseif ($IsMacOS) { "d
 $mach = if ($win) { $env:PROCESSOR_ARCHITECTURE } elseif ($IsLinux -or $IsMacOS) { (uname -m) } else { "x86_64" }
 $arch = if ($mach -match "ARM|aarch64") { "arm64" } else { "x64" }
 $ext = if ($os -eq "win32") { "zip" } else { "tar.gz" }
-$base = "picket-code-$os-$arch.$ext"
+
+# 不带 -Tag 时取最新 release；仓库 API 不可达时要求显式传入。
+if (-not $Tag) {
+  try {
+    $Tag = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ "User-Agent" = "picket-code-downloader" }).tag_name
+  } catch {
+    throw "无法确定最新版本，请显式传入 -Tag，例如: .\download-verify.ps1 -Tag v1.143.1-p1"
+  }
+}
+if (-not $Tag) { throw "无法确定最新版本，请显式传入 -Tag" }
+
+$base = "picket-code-$Tag-$os-$arch.$ext"
+$sums = "picket-code-$Tag-SHA256SUMS"
 
 $prefix = "https://github.com/$Repo/releases/download/$Tag"
 if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
@@ -114,9 +126,9 @@ if (-not (Download-Resume -Url "$prefix/$base" -Path $target)) { throw "下载�
 
 Write-Host "== 校验 SHA256 =="
 $hash = (Get-FileHash -Algorithm SHA256 $target).Hash.ToLower()
-$sumsPath = Join-Path $OutDir "SHA256SUMS"
+$sumsPath = Join-Path $OutDir $sums
 $expected = $null
-if (Get-RemoteFile -Url "$prefix/SHA256SUMS" -Path $sumsPath) {
+if (Get-RemoteFile -Url "$prefix/$sums" -Path $sumsPath) {
   foreach ($line in Get-Content $sumsPath -Encoding UTF8) {
     if ($line -match "^([0-9a-fA-F]{64})\s+\*?(.+?)\s*$" -and $Matches[2] -eq $base) { $expected = $Matches[1].ToLower() }
   }

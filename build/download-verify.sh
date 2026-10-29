@@ -2,19 +2,25 @@
 # Picket Code 下载 + SHA256 校验（Linux/macOS）
 # 支持：显式进度（curl 进度条）、失败重试 5 次、断点续传（-C -）
 # 用法: ./download-verify.sh [TAG]
-#   bash download-verify.sh              # 默认 v1.143.1-p1
-#   bash download-verify.sh v1.143.1-p1
-# 默认 TAG 需与 download-verify.bat / download-verify.ps1 /
-# docs/ai-download-prompt.md 保持一致（build/check-contract.sh 会校验）。
+#   bash download-verify.sh                    # 自动取 GitHub 上最新的 release
+#   bash download-verify.sh v1.143.1-p1        # 指定版本
+# 产物名带版本：picket-code-<tag>-<os>-<arch>.<ext>
 set -uo pipefail
 
-TAG="${1:-v1.143.1-p1}"
 REPO="dantesun/picket-code"
+
+TAG="${1:-}"
+if [ -z "$TAG" ]; then
+  TAG="$(curl -fsSL --max-time 20 "https://api.github.com/repos/$REPO/releases/latest" \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+fi
+[ -n "$TAG" ] || { echo "无法确定最新版本，请显式传入 TAG，例如: bash download-verify.sh v1.143.1-p1" >&2; exit 1; }
 
 MACH="$(uname -m)"
 case "$MACH" in arm64|aarch64) ARCH="arm64";; *) ARCH="x64";; esac
-BASE="picket-code-linux-$ARCH.tar.gz"
-if [ "$(uname -s)" = "Darwin" ]; then BASE="picket-code-darwin-$ARCH.tar.gz"; fi
+BASE="picket-code-$TAG-linux-$ARCH.tar.gz"
+if [ "$(uname -s)" = "Darwin" ]; then BASE="picket-code-$TAG-darwin-$ARCH.tar.gz"; fi
+SUMS="picket-code-$TAG-SHA256SUMS"
 PREFIX="https://github.com/$REPO/releases/download/$TAG"
 
 # 下载单文件：重试 5 次；优先断点续传（-C -），服务器不支持 Range 时自动降级全量
@@ -57,11 +63,11 @@ fetch "$PREFIX/$BASE" "$BASE" || { echo "下载失败: $PREFIX/$BASE"; exit 1; }
 echo "== 校验 SHA256 =="
 HASH="$(sha256_of "$BASE")"
 EXPECTED=""
-rm -f SHA256SUMS
-if fetch "$PREFIX/SHA256SUMS" SHA256SUMS; then
+rm -f "$SUMS"
+if fetch "$PREFIX/$SUMS" "$SUMS"; then
   # GNU coreutils writes "<hash>  <name>" (text mode) or "<hash> *<name>" (binary mode,
   # which is what the Windows runner produces).
-  EXPECTED="$(awk -v f="$BASE" '{ n = $2; sub(/^\*/, "", n); sub(/\r$/, "", n) } n == f { print $1 }' SHA256SUMS | tail -1)"
+  EXPECTED="$(awk -v f="$BASE" '{ n = $2; sub(/^\*/, "", n); sub(/\r$/, "", n) } n == f { print $1 }' "$SUMS" | tail -1)"
 fi
 if [ -z "$EXPECTED" ]; then
   echo "警告: SHA256SUMS 中没有 $BASE，请与该 Release 的说明手工比对"

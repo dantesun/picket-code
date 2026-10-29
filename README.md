@@ -19,9 +19,26 @@ MVP 范围（当前发行）：**Linux (x64)** 与 **Windows (x64)**——`tar.g
 
 ## 快速开始
 
-从 [Releases](https://github.com/dantesun/picket-code/releases) 下载对应平台的压缩包，解压后运行 `picket-code`（Linux）或 `Picket Code.exe`（Windows）。
+当前发行版 **v1.143.1-p1**（上游 VS Code `1.143.1`）。发行包文件名带版本号，推荐从镜像站下载（国内访问更快）：
 
-首次启动 iCode 时按 **F4** 添加模型配置。
+| 平台 | 下载地址 |
+|---|---|
+| Windows (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p1-win32-x64.zip` |
+| Linux (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p1-linux-x64.tar.gz` |
+| 校验和 | `https://picket-code.noware.cn/picket-code-v1.143.1-p1-SHA256SUMS` |
+
+```bash
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p1-SHA256SUMS -o SHA256SUMS
+sha256sum -c --ignore-missing SHA256SUMS
+```
+
+解压后运行 `picket-code`（Linux）或 `Picket Code.exe`（Windows）；归档内的顶层目录不含版本号，仍是 `picket-code-win32-x64/`（Windows）与 `picket-code-linux-x64/`（Linux）。
+
+- 镜像保留最近 **3 个版本**，更早的版本只在 GitHub [Releases](https://github.com/dantesun/picket-code/releases)；
+- 旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容，访问返回 404；
+- 文件名含版本，因此下载 URL 永久有效且可长期缓存。
+
+首次启动 iCode 时按 **F4** 添加模型配置。内置更新器已禁用（构建产物 `product.json` 不含 `updateUrl`），升级方式就是下载新版本压缩包。
 
 ## 从源码构建
 

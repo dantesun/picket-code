@@ -8,19 +8,21 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 
 ## 1. 下载
 
-从 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 下载对应平台的压缩包，或使用[一键下载安装命令](/guide/download)（自动校验 SHA256）。
+从镜像站 `https://picket-code.noware.cn` 下载对应平台的压缩包（文件名带版本号，示例版本 `v1.143.1-p1`；同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上），或使用[一键下载安装命令](/guide/download)（自动解析最新版本并校验 SHA256）。
 
 | 平台 | 压缩包 | 启动方式 |
 |---|---|---|
-| Linux (x64) | `picket-code-linux-x64.tar.gz` | `./picket-code` |
-| Windows (x64) | `picket-code-win32-x64.zip` | `Picket Code.exe` |
+| Linux (x64) | `picket-code-v1.143.1-p1-linux-x64.tar.gz` | `./picket-code` |
+| Windows (x64) | `picket-code-v1.143.1-p1-win32-x64.zip` | `Picket Code.exe` |
+
+> 镜像保留最近 3 个版本，更早的版本只在 GitHub Releases；旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。解压出的顶层目录不带版本号：`picket-code-win32-x64/`、`picket-code-linux-x64/`。
 
 ## 2. 解压
 
 **Linux**
 
 ```bash
-tar -xzf picket-code-linux-x64.tar.gz
+tar -xzf picket-code-v1.143.1-p1-linux-x64.tar.gz
 cd picket-code-linux-x64
 ```
 
@@ -39,6 +41,8 @@ Picket Code.exe
 ```
 
 无需安装、无需联网注册，核心编辑体验完全离线。
+
+升级方式：下载新版本压缩包解压覆盖即可。内置更新器已禁用（构建产物 `product.json` 不含 `updateUrl`，更新器以「no update URL」退出，不再出网检查更新）。
 
 ## 4. 配置模型（待后端接入）
 

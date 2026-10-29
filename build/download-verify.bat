@@ -3,22 +3,25 @@ setlocal enabledelayedexpansion
 REM ============================================================
 REM  Picket Code download + SHA256 verify (Windows cmd)
 REM  Usage: download-verify.bat [TAG]
-REM  Example: download-verify.bat                  (default v1.143.1-p1)
+REM  Example: download-verify.bat                       (latest GitHub release)
 REM           download-verify.bat v1.143.1-p1
 REM
-REM  The default TAG below must match download-verify.sh,
-REM  download-verify.ps1 and docs/ai-download-prompt.md;
-REM  build/check-contract.sh enforces that at build time.
+REM  Artifacts are versioned: picket-code-<tag>-win32-<arch>.zip
+REM  and the checksum file is picket-code-<tag>-SHA256SUMS.
 REM ============================================================
 
-set "TAG=%~1"
-if "%TAG%"=="" set "TAG=v1.143.1-p1"
 set "HOST=https://github.com/dantesun/picket-code"
+set "TAG=%~1"
+if "%TAG%"=="" (
+  for /f "usebackq delims=" %%t in (`powershell -NoProfile -Command "(Invoke-RestMethod -Uri '%HOST%/releases/latest' -Headers @{ 'User-Agent' = 'picket-code-downloader' }).tag_name"`) do set "TAG=%%t"
+)
+if "%TAG%"=="" ( echo could not resolve the latest tag, pass one explicitly & exit /b 1 )
 
 REM detect arch (win32-x64 is the current release; keep ARM compatible)
 set "ARCH=x64"
 if /i "%PROCESSOR_ARCHITECTURE:~0,3%"=="ARM" set "ARCH=arm64"
-set "BASE=picket-code-win32-%ARCH%.zip"
+set "BASE=picket-code-%TAG%-win32-%ARCH%.zip"
+set "SUMS=picket-code-%TAG%-SHA256SUMS"
 set "URL=%HOST%/releases/download/%TAG%/%BASE%"
 
 echo == downloading %BASE% (tag: %TAG%) ==
@@ -41,10 +44,10 @@ if "!ACTUAL!"=="" ( echo could not compute SHA256 of %BASE% & exit /b 1 )
 
 set "EXPECTED="
 REM sha256sum writes "hash  name" (text mode) or "hash *name" (binary mode).
-if exist SHA256SUMS del SHA256SUMS >nul 2>&1
-curl -fSL --retry 3 -o SHA256SUMS "%HOST%/releases/download/%TAG%/SHA256SUMS" >nul 2>&1
-if exist SHA256SUMS (
-  for /f "tokens=1,2 delims= " %%a in ('findstr /i /c:"%BASE%" SHA256SUMS') do (
+if exist "%SUMS%" del "%SUMS%" >nul 2>&1
+curl -fSL --retry 3 -o "%SUMS%" "%HOST%/releases/download/%TAG%/%SUMS%" >nul 2>&1
+if exist "%SUMS%" (
+  for /f "tokens=1,2 delims= " %%a in ('findstr /i /c:"%BASE%" "%SUMS%"') do (
     set "NAME=%%b"
     if "!NAME:~0,1!"=="*" set "NAME=!NAME:~1!"
     if /i "!NAME!"=="%BASE%" set "EXPECTED=%%a"
@@ -52,7 +55,7 @@ if exist SHA256SUMS (
 )
 
 if "!EXPECTED!"=="" (
-  echo WARNING: %BASE% is not in SHA256SUMS, compare with the release notes.
+  echo WARNING: %BASE% is not in %SUMS%, compare with the release notes.
   echo actual SHA256: !ACTUAL!
   echo done. unzip %BASE% and use it.
   endlocal & exit /b 0

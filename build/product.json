@@ -21,7 +21,6 @@
     "serviceUrl": "https://open-vsx.org/vscode/gallery",
     "itemUrl": "https://open-vsx.org/vscode/item"
   },
-  "updateUrl": "https://github.com/dantesun/picket-code/releases",
   "quality": "stable",
   "builtInExtensions": [
     {
@@ -90,6 +89,7 @@
   "tunnelApplicationConfig": {},
   "webviewContentExternalBaseUrlTemplate": null,
   "voiceWsUrl": null,
+  "updateUrl": null,
   "builtInExtensionsEnabledWithAutoUpdates": null,
   "defaultChatAgent": null,
   "trustedExtensionAuthAccess": null

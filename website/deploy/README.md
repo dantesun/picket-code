@@ -1,22 +1,33 @@
-# 部署到 Cloudflare Pages（noware.cn）
+# 部署到 Cloudflare Pages + 下载 Worker（noware.cn）
 
-Picket Code 官网是纯静态站点（VitePress 构建产物），托管在 **Cloudflare Pages**，域名绑定 **noware.cn**，构建由 **GitHub** 触发。大文件（发行包、截图等）走 **R2** 存储。
+Picket Code 官网是纯静态站点（VitePress 构建产物），托管在 **Cloudflare Pages**，域名绑定 **`picket-code.noware.cn`**，构建由 **GitHub** 触发。发行包等大文件放 **Cloudflare R2**，由同一个域名下的 **Worker** 直出。
 
 > **实际部署状态（2026-10-28，Git 集成已完成）**：Pages 项目 `picket-code` 已接入 GitHub（`dantesun/picket-code`，production branch `main`），每次 push 到 `website/**` 自动构建上线；自定义域名 `picket-code.noware.cn` 已绑定并生效（active），SSL 由 Google Trust Services 签发（有效期至 2027-01-26）。构建配置：Root directory `website`，Build command `npm ci && npm run docs:build`，Output directory `docs/.vitepress/dist`。
 
 ## 总体架构
 
 ```
-GitHub（源码 + website/ 站点）
-    │ git push 触发
-    ▼
-Cloudflare Pages（构建 VitePress 静态站点）
-    │ 自定义域名
-    ▼
-noware.cn / www.noware.cn（SSL、CDN、WAF 全自带）
-
-Cloudflare R2：发行包 / 截图 / 大资源（download.noware.cn）
+GitHub（源码 + website/ 站点 + infra/worker/download）
+    │ push 触发
+    ├──────────────► Cloudflare Pages（构建 VitePress 静态站点）
+    │                     │ 自定义域名
+    │                     ▼
+    │            picket-code.noware.cn（SSL、CDN、WAF 全自带）
+    │                     ▲
+    └──────────────► Cloudflare Worker（/picket-code-* 路由，仅 CI 部署）
+                          │ 读取
+                          ▼
+                  Cloudflare R2 桶 picket-releases（发行包 + SHA256SUMS）
 ```
+
+同一个主机名承担两件事，靠路径分流：
+
+| 路径 | 提供者 | 内容 |
+|---|---|---|
+| `/picket-code-*` | Worker `picket-downloads`（`infra/worker/download`） | R2 桶 `picket-releases` 中的发行包与校验和 |
+| 其余全部路径 | Cloudflare Pages（`picket-code` 项目） | VitePress 文档站 |
+
+Worker 的路由 `picket-code.noware.cn/picket-code-*` 命中时优先于 Pages，因此站点其余路径不受影响。
 
 ## 一、把站点放进仓库
 
@@ -59,38 +70,36 @@ git push
 3. 保存后 Cloudflare 自动为域名签发 SSL 证书（Google CA，约 1–15 分钟），状态从 pending → active；
 4. 生效后即可通过 `https://picket-code.noware.cn` 访问（已完成，证书有效期至 2027-01-26）。
 
-## 四、R2 承载下载资源（可选）
+## 四、下载资源：R2 桶 + 下载 Worker（已落地）
 
-发行包目前发布在 GitHub Releases（作为唯一事实来源）。如需国内加速或统一资源出口，可用 R2 做镜像：
+### 1. 下载地址的形式
 
-1. 创建 R2 桶 `picket-code-dist`，开启 **Public access（r2.dev 或自定义域）**；
-2. 自定义域：`download.noware.cn`（CNAME 指向桶的 r2.dev 域名）；
-3. 上传发行包与 `SHA256SUMS`；
-4. （可选）用 Workers 做下载统计 / 重定向：`download.noware.cn/<version>/<file>` → R2 对象或 GitHub Releases。
+对象键就是文件名，文件名带版本（示例 tag `v1.143.1-p1`）：
 
-同步脚本示例（GitHub Actions + rclone，将 Release 附件镜像到 R2）：
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-win32-x64.zip`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-linux-x64.tar.gz`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-SHA256SUMS`
 
-```yaml
-# .github/workflows/mirror-r2.yml（示例）
-name: Mirror releases to R2
-on:
-  release:
-    types: [published]
-jobs:
-  mirror:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: rclone/actions/rclone-action@v1
-        with:
-          args: sync :s3:<bucket> --config <(echo "[s3]")  # 按需配置 R2 S3 兼容端点
-```
+因为文件名含版本，一个 URL 对应的对象永不覆盖，Worker 因此返回 `cache-control: public, max-age=31536000, immutable`，可被 CDN 与客户端长期缓存。桶里**没有** `latest` 别名，旧的无版本对象（`picket-code-win32-x64.zip`、`SHA256SUMS`）已删除且不再生成，请求返回 404（不提供兼容）。
 
-> R2 的 S3 兼容端点与凭据在 Cloudflare Dashboard → R2 → 桶 → Settings 中查看；GitHub Secrets 中配置 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`（即 R2 API Token）。
+### 2. R2 桶与保留策略
 
-## 五、备用方案：Wrangler 直接上传
+- 桶：`picket-releases`（Worker 用 `RELEASES` 绑定）；
+- 上传：`release.yml` 的 `r2-sync` 任务从已发布的 Release 下载 `picket-code-*` 资产，`rclone copy release/ r2:picket-releases/`（用 `copy` 而非 `sync`，避免删除历史版本）；
+- 保留：`.github/scripts/prune-r2.sh` 只保留最近 **3 个版本**（`KEEP=3`，按 tag 的 `vX.Y.Z` + `-pN` 排序），更早的版本只在 GitHub Releases；
+- 凭据：GitHub Secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT`。
 
-不想接 Git 时，可用 Wrangler 直接上传构建产物（`wrangler.toml.example`）：
+### 3. 下载 Worker
+
+- 代码：`infra/worker/download`（`wrangler.toml`：worker 名 `picket-downloads`，路由 `picket-code.noware.cn/picket-code-*`，zone `noware.cn`，R2 绑定 `RELEASES` → `picket-releases`）；
+- 行为：只接受 `GET` / `HEAD`，只服务以 `picket-code-` 开头且不含 `..` 的键，支持 Range（断点续传），未命中即 404；
+- 部署：**只从 CI 部署**——`.github/workflows/deploy-worker.yml` 在 `infra/worker/download/**` 或该 workflow 自身变更时，以及手动 `workflow_dispatch` 时执行 `wrangler deploy`。
+
+> **不要在本地 `wrangler deploy`**：Cloudflare API Token 只存在 GitHub Actions（Secret `CF_API_TOKEN`，Account ID 取仓库变量 `CF_ACCOUNT_ID`），本地部署会绕开唯一的凭据来源与审计路径。改完 worker 代码后 push 或手动触发该 workflow 即可。
+
+## 五、备用方案：Wrangler 直接上传站点
+
+不想接 Git 时，可用 Wrangler 直接上传 Pages 构建产物（`wrangler.toml.example`）。注意这只适用于**站点**，下载 Worker 仍只从 CI 部署（见上节）：
 
 ```bash
 npm install -g wrangler
@@ -108,7 +117,9 @@ wrangler pages deploy docs/.vitepress/dist --project-name=picket-code
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限：Workers Scripts Edit / Pages Edit） |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
 
-## 环境变量与占位符
+## 站点内的下载链接与变量
 
-- 站点内下载链接当前指向 GitHub Releases（`https://github.com/dantesun/picket-code/releases`），版本号 `v1.143.1` 位于 `docs/guide/download.md`，发版后按需更新；
+- 站内下载链接指向镜像主机 `https://picket-code.noware.cn`，文件名形如 `picket-code-<tag>-<os>-<arch>.<ext>`；文档中的具体示例版本写在 `website/docs/guide/download.md`、`website/docs/guide/releases.md`，发版后按需更新示例；
+- 仓库变量 `R2_PUBLIC_BASE_URL` 决定 Release 说明顶部的镜像链接（未设置时该步骤跳过，Release 只保留 GitHub 链接）；
+- 站点的下载脚本（`build/download-verify.sh|ps1|bat`）不带版本时自行解析 GitHub 最新 release，因此脚本本身无需随版本改动；
 - 如需让下载按钮动态读取最新版本，可后续在 Pages Functions 中加一层 `api/latest-release`，从 GitHub API 读取最新 tag。
