@@ -187,7 +187,8 @@ jobs:
             fi
           done
           if ! node -e '
-            const p = require(process.argv[1]);
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
             const v = p.builtInExtensionsEnabledWithAutoUpdates;
             process.exit(Array.isArray(v) && v.length === 0 ? 0 : 1);
           ' "$app/product.json"; then
