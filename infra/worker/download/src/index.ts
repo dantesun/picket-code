@@ -78,13 +78,18 @@ export default {
 		object.writeHttpMetadata(headers);
 		headers.set('etag', object.httpEtag);
 		headers.set('accept-ranges', 'bytes');
-		if (!headers.has('content-type')) {
+		// R2 reports a full-object range even for HEAD; only a client Range makes
+		// the response partial.
+		const wantsRange = request.headers.has('range');
+		if (key.endsWith('-SHA256SUMS')) {
+			headers.set('content-type', 'text/plain; charset=utf-8');
+		} else if (!headers.has('content-type')) {
 			headers.set('content-type', contentTypeFor(key));
 		}
 		headers.set('cache-control', 'public, max-age=31536000, immutable');
 
 		let status = 200;
-		if (object.range) {
+		if (wantsRange && object.range) {
 			const { offset, length } = object.range;
 			status = 206;
 			headers.set('content-length', String(length));
