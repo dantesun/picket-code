@@ -2,8 +2,8 @@
 
 一条命令完成全部流程：**拉取最新下载脚本 → 解析最新版本 → 下载发行包（显式进度/失败重试/断点续传）→ SHA256 校验 → 解压**。
 
-> 当前版本：**v1.143.1-p2**（上游 VS Code `1.143.1`）。
-> 脚本不带版本参数时自动解析 GitHub 上最新的 release；显式传入标签（如 `v1.143.1-p2`）同样支持。
+> 当前版本：**v1.143.1-p3**（上游 VS Code `1.143.1`）。
+> 脚本不带版本参数时自动解析 GitHub 上最新的 release；显式传入标签（如 `v1.143.1-p3`）同样支持。
 > 发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
 > 脚本自带：显式进度（curl 进度条 / 百分比）、失败自动重试 5 次、断点续传（服务器支持 Range 时）。
 
@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command '$f=(Join-Path $PWD "down
 **已下载过脚本、只想重新运行**（要指定版本就加 `-Tag`）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v1.143.1-p2
+powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v1.143.1-p3
 ```
 
 ---
@@ -42,16 +42,16 @@ curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/dow
 
 ## 直接下载镜像直链（不跑脚本时）
 
-文件名带版本号（示例 tag `v1.143.1-p2`）：
+文件名带版本号（示例 tag `v1.143.1-p3`）：
 
 ```text
-https://picket-code.noware.cn/picket-code-v1.143.1-p2-win32-x64.zip
-https://picket-code.noware.cn/picket-code-v1.143.1-p2-linux-x64.tar.gz
-https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS
+https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip
+https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz
+https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS
 ```
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
@@ -65,9 +65,9 @@ sha256sum -c --ignore-missing SHA256SUMS
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
-| Tag | 自动（GitHub 上最新的 release） | 版本标签，如 `v1.143.1-p2`；不传则解析最新版本 |
+| Tag | 自动（GitHub 上最新的 release） | 版本标签，如 `v1.143.1-p3`；不传则解析最新版本 |
 
-示例：`bash dv.sh v1.143.1-p2`
+示例：`bash dv.sh v1.143.1-p3`
 
 ---
 

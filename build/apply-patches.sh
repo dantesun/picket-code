@@ -29,6 +29,7 @@ command -v python3 >/dev/null || { echo "FATAL: python3 is required (product.jso
 
 # ---- 1. product.json merge ----
 echo "==> [picket-code] product.json merge: build/product.json"
+python3 "$SCRIPT_DIR/check-product-shapes.py" "$VSCODE/product.json" "$SCRIPT_DIR/product.json" || exit 3
 python3 - "$VSCODE/product.json" "$SCRIPT_DIR/product.json" <<'PYEOF'
 import json, sys
 target, overlay = sys.argv[1], sys.argv[2]

@@ -1,17 +1,17 @@
 # 下载与安装
 
-> 当前版本：**v1.143.1-p2**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
+> 当前版本：**v1.143.1-p3**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
 
 ## 版本标签与产物
 
-- 标签格式：`<上游 VS Code 版本>`，同一上游版本的自有重建追加 `-pN`，如 `v1.143.1` → `v1.143.1-p2`；
+- 标签格式：`<上游 VS Code 版本>`，同一上游版本的自有重建追加 `-pN`，如 `v1.143.1` → `v1.143.1-p3`；
 - 文件名带版本号（`picket-code-<tag>-<os>-<arch>.<ext>`），GitHub Release 资产与镜像上的文件名完全一致：
 
-| 平台 | 资产（示例 tag `v1.143.1-p2`） |
+| 平台 | 资产（示例 tag `v1.143.1-p3`） |
 |---|---|
-| Linux (x64) | `picket-code-v1.143.1-p2-linux-x64.tar.gz` |
-| Windows (x64) | `picket-code-v1.143.1-p2-win32-x64.zip` |
-| 校验 | `picket-code-v1.143.1-p2-SHA256SUMS` |
+| Linux (x64) | `picket-code-v1.143.1-p3-linux-x64.tar.gz` |
+| Windows (x64) | `picket-code-v1.143.1-p3-win32-x64.zip` |
+| 校验 | `picket-code-v1.143.1-p3-SHA256SUMS` |
 
 归档内的顶层目录**不带**版本号：`picket-code-win32-x64/`、`picket-code-linux-x64/`。
 
@@ -26,11 +26,11 @@
 
 ## 方式一：直接下载
 
-镜像基地址：`https://picket-code.noware.cn`（示例版本 `v1.143.1-p2`）：
+镜像基地址：`https://picket-code.noware.cn`（示例版本 `v1.143.1-p3`）：
 
-- Windows (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p2-win32-x64.zip`
-- Linux (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p2-linux-x64.tar.gz`
-- 校验和：`https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS`
+- Windows (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip`
+- Linux (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz`
+- 校验和：`https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS`
 
 同一版本的同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上。
 
@@ -41,15 +41,15 @@
 ## 校验
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-Windows 上可用 `Get-FileHash .\picket-code-v1.143.1-p2-win32-x64.zip -Algorithm SHA256`，再与该版本 `SHA256SUMS` 中同名的行比对。
+Windows 上可用 `Get-FileHash .\picket-code-v1.143.1-p3-win32-x64.zip -Algorithm SHA256`，再与该版本 `SHA256SUMS` 中同名的行比对。
 
 ## 方式二：一键下载安装命令
 
-一条命令完成全部流程：**拉取最新下载脚本 → 解析最新版本 → 下载发行包（显式进度 / 失败重试 / 断点续传）→ SHA256 校验 → 解压**。不带版本参数时脚本自动解析最新的 release；传入标签（如 `v1.143.1-p2`）则下载该版本。
+一条命令完成全部流程：**拉取最新下载脚本 → 解析最新版本 → 下载发行包（显式进度 / 失败重试 / 断点续传）→ SHA256 校验 → 解压**。不带版本参数时脚本自动解析最新的 release；传入标签（如 `v1.143.1-p3`）则下载该版本。
 
 ### Windows（PowerShell 单行，自动走系统代理）
 
@@ -60,7 +60,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command '$f=(Join-Path $PWD "down
 ```
 
 ```cmd [CMD]
-powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v1.143.1-p2
+powershell -NoProfile -ExecutionPolicy Bypass -File .\download-verify.ps1 -Tag v1.143.1-p3
 ```
 
 :::
@@ -83,19 +83,19 @@ curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/dow
 
 | 参数 | 默认 | 说明 |
 |---|---|---|
-| `Tag` | 自动（GitHub 上最新的 release） | 版本标签，如 `v1.143.1-p2`；不传则解析最新版本 |
+| `Tag` | 自动（GitHub 上最新的 release） | 版本标签，如 `v1.143.1-p3`；不传则解析最新版本 |
 
 ## 校验机制
 
 SHA256 不写死在脚本里（每次发版都会变）：脚本会解析该版本的 `picket-code-<tag>-SHA256SUMS` 并逐包比对。手工核对：
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
 ```powershell
-Get-FileHash .\picket-code-v1.143.1-p2-win32-x64.zip -Algorithm SHA256
+Get-FileHash .\picket-code-v1.143.1-p3-win32-x64.zip -Algorithm SHA256
 ```
 
 `SHA256SUMS` 同时可从 GitHub Release 附件和镜像取得，两处文件名一致（`picket-code-<tag>-SHA256SUMS`）。
@@ -110,7 +110,7 @@ Get-FileHash .\picket-code-v1.143.1-p2-win32-x64.zip -Algorithm SHA256
 优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本回 GitHub Releases。
 
 **Q：如何换版本？**
-把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p2`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本只在 GitHub Releases。
+把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p3`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本只在 GitHub Releases。
 
 **Q：为什么下载 URL 里带版本号？**
 文件名带版本，一个 URL 背后的内容永不改变，因此可以永久引用并长期缓存；也正因如此，旧的固定 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。
@@ -119,4 +119,4 @@ Get-FileHash .\picket-code-v1.143.1-p2-win32-x64.zip -Algorithm SHA256
 重新下载新版本压缩包并解压覆盖即可。内置更新器已禁用：构建产物 `product.json` 不含 `updateUrl`，更新器启动时直接以「no update URL」退出，不再出网检查更新。
 
 **Q：`v1.143.1` 还能下载吗？**
-不能。该版本（2026-10-27 发布）的 ASAR 含 748 个重叠条目，会崩溃扩展宿主，已删除；请使用 `v1.143.1-p2`。
+不能。该版本（2026-10-27 发布）的 ASAR 含 748 个重叠条目，会崩溃扩展宿主，已删除；请使用 `v1.143.1-p3`。

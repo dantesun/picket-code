@@ -1,46 +1,34 @@
-diff --git a/src/vs/workbench/services/accounts/browser/defaultAccount.ts b/src/vs/workbench/services/accounts/browser/defaultAccount.ts
-index b505994a112..e1eab2ab889 100644
---- a/src/vs/workbench/services/accounts/browser/defaultAccount.ts
-+++ b/src/vs/workbench/services/accounts/browser/defaultAccount.ts
-@@ -92,7 +92,24 @@ interface IMcpRegistryResponse {
- 	readonly mcp_registries: ReadonlyArray<IMcpRegistryProvider>;
- }
+diff --git a/src/vs/editor/standalone/browser/standaloneServices.ts b/src/vs/editor/standalone/browser/standaloneServices.ts
+index 0e591317f35..c125f5d0c11 100644
+--- a/src/vs/editor/standalone/browser/standaloneServices.ts
++++ b/src/vs/editor/standalone/browser/standaloneServices.ts
+@@ -1077,6 +1077,10 @@ class StandaloneDefaultAccountService implements IDefaultAccountService {
+ 		// no-op
+ 	}
  
--function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent): IDefaultAccountConfig {
-+function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent | undefined): IDefaultAccountConfig {
-+	// this build ships without the default chat agent: return a neutral config so the provider has sane defaults
-+	if (!defaultChatAgent) {
-+		return {
-+			preferredExtensions: [],
-+			authenticationProvider: {
-+				default: { id: '', name: '' },
-+				enterprise: { id: '', name: '' },
-+				enterpriseProviderConfig: '',
-+				scopes: [],
-+			},
-+			tokenEntitlementUrl: '',
-+			entitlementUrl: '',
-+			mcpRegistryDataUrl: '',
-+			managedSettingsUrl: '',
-+		};
++	markDefaultAccountProviderUnavailable(): void {
++		// no-op
 +	}
 +
- 	return {
- 		preferredExtensions: [
- 			defaultChatAgent.chatExtensionId,
-@@ -1645,6 +1662,12 @@ class DefaultAccountProviderContribution extends Disposable implements IWorkbenc
- 		@IDefaultAccountService defaultAccountService: IDefaultAccountService,
- 	) {
- 		super();
-+
-+		// this build ships without the default chat agent: do not register a provider at all
-+		if (!productService.defaultChatAgent) {
-+			return;
-+		}
-+
- 		const defaultAccountProvider = this._register(instantiationService.createInstance(DefaultAccountProvider, toDefaultAccountConfig(productService.defaultChatAgent)));
- 		defaultAccountService.setDefaultAccountProvider(defaultAccountProvider);
+ 	async refresh(): Promise<IDefaultAccount | null> {
+ 		return null;
  	}
+diff --git a/src/vs/platform/defaultAccount/common/defaultAccount.ts b/src/vs/platform/defaultAccount/common/defaultAccount.ts
+index d980c8755c9..5ffde777250 100644
+--- a/src/vs/platform/defaultAccount/common/defaultAccount.ts
++++ b/src/vs/platform/defaultAccount/common/defaultAccount.ts
+@@ -95,6 +95,11 @@ export interface IDefaultAccountService {
+ 	getDefaultAccount(): Promise<IDefaultAccount | null>;
+ 	getDefaultAccountAuthenticationProvider(): IDefaultAccountAuthenticationProvider;
+ 	setDefaultAccountProvider(provider: IDefaultAccountProvider): void;
++	/**
++	 * Called when this build has no default account provider at all (no `defaultChatAgent`
++	 * in `product.json`): releases everyone waiting for provider initialization.
++	 */
++	markDefaultAccountProviderUnavailable(): void;
+ 	refresh(options?: IDefaultAccountRefreshOptions): Promise<IDefaultAccount | null>;
+ 	signIn(options?: { additionalScopes?: readonly string[];[key: string]: unknown }): Promise<IDefaultAccount | null>;
+ 	signOut(): Promise<void>;
 diff --git a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
 index 3670af7480a..997ffb91ce8 100644
 --- a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
@@ -100,6 +88,20 @@ index bd1e67ecf9c..3c0c3d8b5d5 100644
  
  		return { malicious, deprecated, search, autoUpdate };
  	}
+diff --git a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+index 7cdd8238766..c2f1e009258 100644
+--- a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+@@ -2422,7 +2422,8 @@ configurationRegistry.registerConfiguration({
+ 		[ChatConfiguration.CopilotCliCommandEnabled]: {
+ 			type: 'boolean',
+ 			markdownDescription: nls.localize('chat.copilotCliCommand.enabled', "Controls whether integrated terminals include the `copilot` command that ships with VS Code. The command runs GitHub Copilot CLI and offers to install it when it's missing. A GitHub Copilot CLI that you installed yourself isn't affected."),
+-			default: true,
++			// this build ships no copilot CLI shim: keep the plain "install commands in PATH" entry
++			default: false,
+ 			scope: ConfigurationScope.APPLICATION,
+ 			policy: {
+ 				name: 'CopilotCliCommand',
 diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
 index ebe916fe9b6..bfd951d08c0 100644
 --- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
@@ -130,6 +132,20 @@ index ebe916fe9b6..bfd951d08c0 100644
  const completionsConfigurationTargets = [
  	ConfigurationTarget.WORKSPACE_FOLDER,
  	ConfigurationTarget.WORKSPACE,
+diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
+index 4c547b3e523..4d5457c9215 100644
+--- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
++++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusEntry.ts
+@@ -191,7 +191,8 @@ export class ChatStatusBarEntry extends Disposable implements IWorkbenchContribu
+ 
+ 	private update(): void {
+ 		const sentiment = this.chatEntitlementService.sentiment;
+-		if (!sentiment.hidden) {
++		// this build ships without the default chat agent, so there is no Copilot status to show
++		if (!sentiment.hidden && product.defaultChatAgent) {
+ 			const props = this.getEntryProps();
+ 			if (this.entry) {
+ 				this.entry.update(props);
 diff --git a/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts b/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts
 index e2bd4dd731c..8298e87bb6a 100644
 --- a/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts
@@ -163,6 +179,57 @@ index 7d9de121739..22adf834f47 100644
  			for (const packExtension of this.getAllPackedExtensions(extension, this.local)) {
  				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
  					extensionsToUninstall.push({ extension: packExtension.local });
+diff --git a/src/vs/workbench/contrib/preferences/browser/settingsLayout.ts b/src/vs/workbench/contrib/preferences/browser/settingsLayout.ts
+index 2c363f1517f..c6ba71cbff6 100644
+--- a/src/vs/workbench/contrib/preferences/browser/settingsLayout.ts
++++ b/src/vs/workbench/contrib/preferences/browser/settingsLayout.ts
+@@ -32,7 +32,6 @@ const COMMONLY_USED_SETTINGS: readonly string[] = [
+ 	'editor.fontSize',
+ 	'editor.formatOnSave',
+ 	'files.autoSave',
+-	'GitHub.copilot-chat.manageExtension',
+ 	'editor.defaultFormatter',
+ 	'editor.fontFamily',
+ 	'editor.wordWrap',
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+index 168a3d01b40..c4a640799eb 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+@@ -233,7 +233,7 @@ const CopilotSignedOutButton = Button(localize('setupCopilotButton.setup', "Use
+ const CopilotSignedInButton = Button(localize('setupCopilotButton.setup', "Use AI Features"), `command:workbench.action.chat.triggerSetup`);
+ const CopilotCompleteButton = Button(localize('setupCopilotButton.chatWithCopilot', "Start to Chat"), 'command:workbench.action.chat.open');
+ 
+-function createCopilotSetupStep(id: string, button: string, when: string, includeTerms: boolean): BuiltinGettingStartedStep {
++function createCopilotSetupStep(id: string, button: string, includeTerms: boolean): BuiltinGettingStartedStep {
+ 	const description = includeTerms ?
+ 		`${CopilotDescription}\n${CopilotTermsString}\n${button}` :
+ 		`${CopilotDescription}\n${button}`;
+@@ -242,7 +242,9 @@ function createCopilotSetupStep(id: string, button: string, when: string, includ
+ 		id,
+ 		title: CopilotStepTitle,
+ 		description,
+-		when: `${when} && !chatSetupHidden && !chatSetupDisabledInWorkspace`,
++		// this build ships without the default chat agent: every branch would link to a
++		// provider that does not exist, so the step never renders
++		when: 'false',
+ 		media: {
+ 			type: 'svg', altText: 'VS Code Copilot multi file edits', path: 'multi-file-edits.svg'
+ 		},
+@@ -262,10 +264,10 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
+ 		content: {
+ 			type: 'steps',
+ 			steps: [
+-				createCopilotSetupStep('CopilotSetupAnonymous', CopilotAnonymousButton, 'chatAnonymous && !chatSetupCompleted', true),
+-				createCopilotSetupStep('CopilotSetupSignedOut', CopilotSignedOutButton, 'chatEntitlementSignedOut && !chatAnonymous && !github.copilot.hasByokModels', false),
+-				createCopilotSetupStep('CopilotSetupComplete', CopilotCompleteButton, 'chatSetupCompleted && !chatSetupDisabled && (chatAnonymous || chatPlanPro || chatPlanProPlus || chatPlanMax || chatPlanBusiness || chatPlanEnterprise || chatPlanFree)', false),
+-				createCopilotSetupStep('CopilotSetupSignedIn', CopilotSignedInButton, '!chatEntitlementSignedOut && (!chatSetupCompleted || chatSetupDisabled || chatPlanCanSignUp)', false),
++				createCopilotSetupStep('CopilotSetupAnonymous', CopilotAnonymousButton, true),
++				createCopilotSetupStep('CopilotSetupSignedOut', CopilotSignedOutButton, false),
++				createCopilotSetupStep('CopilotSetupComplete', CopilotCompleteButton, false),
++				createCopilotSetupStep('CopilotSetupSignedIn', CopilotSignedInButton, false),
+ 				{
+ 					id: 'pickColorTheme',
+ 					title: localize('gettingStarted.pickColor.title', "Choose your theme"),
 diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
 index ff993368801..c45d55c4a8a 100644
 --- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
@@ -202,3 +269,59 @@ index ff993368801..c45d55c4a8a 100644
  		this._isShowing = true;
  		this.previouslyFocusedElement = getActiveWindow().document.activeElement as HTMLElement | undefined;
  
+diff --git a/src/vs/workbench/services/accounts/browser/defaultAccount.ts b/src/vs/workbench/services/accounts/browser/defaultAccount.ts
+index b505994a112..e4ad0c0c7e1 100644
+--- a/src/vs/workbench/services/accounts/browser/defaultAccount.ts
++++ b/src/vs/workbench/services/accounts/browser/defaultAccount.ts
+@@ -92,7 +92,24 @@ interface IMcpRegistryResponse {
+ 	readonly mcp_registries: ReadonlyArray<IMcpRegistryProvider>;
+ }
+ 
+-function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent): IDefaultAccountConfig {
++function toDefaultAccountConfig(defaultChatAgent: IDefaultChatAgent | undefined): IDefaultAccountConfig {
++	// this build ships without the default chat agent: return a neutral config so the provider has sane defaults
++	if (!defaultChatAgent) {
++		return {
++			preferredExtensions: [],
++			authenticationProvider: {
++				default: { id: '', name: '' },
++				enterprise: { id: '', name: '' },
++				enterpriseProviderConfig: '',
++				scopes: [],
++			},
++			tokenEntitlementUrl: '',
++			entitlementUrl: '',
++			mcpRegistryDataUrl: '',
++			managedSettingsUrl: '',
++		};
++	}
++
+ 	return {
+ 		preferredExtensions: [
+ 			defaultChatAgent.chatExtensionId,
+@@ -173,6 +190,10 @@ export class DefaultAccountService extends Disposable implements IDefaultAccount
+ 		};
+ 	}
+ 
++	markDefaultAccountProviderUnavailable(): void {
++		this.initBarrier.open();
++	}
++
+ 	setDefaultAccountProvider(provider: IDefaultAccountProvider): void {
+ 		if (this.defaultAccountProvider) {
+ 			throw new Error('Default account provider is already set');
+@@ -1645,6 +1666,14 @@ class DefaultAccountProviderContribution extends Disposable implements IWorkbenc
+ 		@IDefaultAccountService defaultAccountService: IDefaultAccountService,
+ 	) {
+ 		super();
++
++		// this build ships without the default chat agent: do not register a provider at all,
++		// but release anyone waiting for the provider so they do not hang forever
++		if (!productService.defaultChatAgent) {
++			defaultAccountService.markDefaultAccountProviderUnavailable();
++			return;
++		}
++
+ 		const defaultAccountProvider = this._register(instantiationService.createInstance(DefaultAccountProvider, toDefaultAccountConfig(productService.defaultChatAgent)));
+ 		defaultAccountService.setDefaultAccountProvider(defaultAccountProvider);
+ 	}

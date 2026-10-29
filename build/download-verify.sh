@@ -3,7 +3,7 @@
 # 支持：显式进度（curl 进度条）、失败重试 5 次、断点续传（-C -）
 # 用法: ./download-verify.sh [TAG]
 #   bash download-verify.sh                    # 自动取 GitHub 上最新的 release
-#   bash download-verify.sh v1.143.1-p2        # 指定版本
+#   bash download-verify.sh v1.143.1-p3        # 指定版本
 # 产物名带版本：picket-code-<tag>-<os>-<arch>.<ext>
 set -uo pipefail
 
@@ -14,7 +14,7 @@ if [ -z "$TAG" ]; then
   TAG="$(curl -fsSL --max-time 20 "https://api.github.com/repos/$REPO/releases/latest" \
     | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
 fi
-[ -n "$TAG" ] || { echo "无法确定最新版本，请显式传入 TAG，例如: bash download-verify.sh v1.143.1-p2" >&2; exit 1; }
+[ -n "$TAG" ] || { echo "无法确定最新版本，请显式传入 TAG，例如: bash download-verify.sh v1.143.1-p3" >&2; exit 1; }
 
 MACH="$(uname -m)"
 case "$MACH" in arm64|aarch64) ARCH="arm64";; *) ARCH="x64";; esac

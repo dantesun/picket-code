@@ -172,17 +172,28 @@ jobs:
       # The Copilot removal (patches 52/53) must not leave dangling product.json
       # keys that point at extensions we do not ship: defaultChatAgent would make
       # the account/chat UI offer a sign-in for a missing extension.
-      - name: Verify no account residues
+      # builtInExtensionsEnabledWithAutoUpdates stays, but empty: upstream iterates
+      # it without a guard (extensionsScannerService), so removing the key shipped
+      # a build whose extension scanner threw and loaded zero extensions.
+      - name: Verify no Copilot residues
         shell: bash
         run: |
           app=picket-code-${{ matrix.platform }}-${{ matrix.arch }}/resources/app
           fail=0
-          for key in defaultChatAgent trustedExtensionAuthAccess builtInExtensionsEnabledWithAutoUpdates; do
+          for key in defaultChatAgent trustedExtensionAuthAccess updateUrl; do
             if grep -q "\"$key\"" "$app/product.json"; then
               echo "RESIDUE: product.json still defines $key"
               fail=1
             fi
           done
+          if ! node -e '
+            const p = require(process.argv[1]);
+            const v = p.builtInExtensionsEnabledWithAutoUpdates;
+            process.exit(Array.isArray(v) && v.length === 0 ? 0 : 1);
+          ' "$app/product.json"; then
+            echo "RESIDUE: builtInExtensionsEnabledWithAutoUpdates must ship as an empty array"
+            fail=1
+          fi
           if grep -qiE 'github\.copilot|github-authentication|microsoft-authentication' "$app/product.json"; then
             echo "RESIDUE: product.json still references a removed Copilot/auth extension"
             fail=1
@@ -193,6 +204,12 @@ jobs:
               fail=1
             fi
           done
+          # no Copilot CLI shim: the terminal would offer a command that cannot run
+          shim=$(find "$app" -maxdepth 3 -iname 'copilot*' -not -path '*node_modules*' 2>/dev/null)
+          if [ -n "$shim" ]; then
+            echo "RESIDUE: Copilot CLI shim shipped: $shim"
+            fail=1
+          fi
           # We have no update server: the stock Windows updater would ask GitHub's
           # releases page for update metadata and log "Server returned 404" on every
           # start. Without updateUrl it disables itself (abstractUpdateService.ts).
@@ -200,7 +217,13 @@ jobs:
             echo "RESIDUE: product.json still defines updateUrl"
             fail=1
           fi
-          if [ "$fail" -eq 0 ]; then echo "no account residues in the packaged app"; fi
+          # Reporting only: the chat UI keeps upstream strings, so this number is a
+          # baseline to watch, not a gate.
+          bundle="$app/out/vs/workbench/workbench.desktop.main.js"
+          if [ -f "$bundle" ]; then
+            echo "info: 'Copilot' appears $(grep -o 'Copilot' "$bundle" | wc -l) times in the workbench bundle"
+          fi
+          if [ "$fail" -eq 0 ]; then echo "no Copilot residues in the packaged app"; fi
           exit $fail
 
       - name: Smoke test packaged app
@@ -217,7 +240,7 @@ jobs:
           $hits = @()
           if (Test-Path $logs) {
             $hits = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
-              Select-String -Pattern 'ERR_INVALID_PACKAGE_CONFIG|Invalid package config|Uncaught Exception|Could not locate the bindings file|Cannot find module'
+              Select-String -Pattern 'ERR_INVALID_PACKAGE_CONFIG|Invalid package config|Uncaught Exception|Could not locate the bindings file|Cannot find module|is not iterable|Error scanning installed extensions|reading .extensionId'
           }
           Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           if ($hits) {
