@@ -1,0 +1,252 @@
+name: verify release (runtime)
+
+# Downloads a published build from GitHub Releases and checks what a fresh
+# install does, on the runner instead of on a developer's machine:
+#   - the packaged product.json has the shapes upstream code expects;
+#   - `--list-extensions` exits 0 (in p1/p2 it died with
+#     "builtInExtensionsEnabledWithAutoUpdates is not iterable");
+#   - a real window starts and the extension host activates the built-ins
+#     (`_doActivateExtension` lines), so "extensions load" is measured, not
+#     inferred from the absence of an error;
+#   - the app log carries none of the three signatures of the p1/p2 regressions.
+#
+# Runs automatically once a Release workflow finishes and can be dispatched for
+# any tag.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to verify (empty = latest release)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  TAG_INPUT: ${{ inputs.tag }}
+  TAG_FROM_RUN: ${{ github.event.workflow_run.head_branch }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Resolve the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${TAG_INPUT:-$TAG_FROM_RUN}"
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          echo "verifying $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download the published build and verify its checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir dl
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*-linux-x64.tar.gz' --pattern '*-SHA256SUMS' --dir dl --clobber
+          cd dl
+          # the checksum file also lists the win32 asset, which is not downloaded here
+          sha256sum -c ./*-SHA256SUMS --ignore-missing
+          tar -xzf ./*-linux-x64.tar.gz
+          mv picket-code-linux-x64 "$GITHUB_WORKSPACE/app-root"
+
+      - name: Assert the packaged product.json shapes
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const problems = [];
+            if (!Array.isArray(p.builtInExtensionsEnabledWithAutoUpdates) || p.builtInExtensionsEnabledWithAutoUpdates.length)
+              problems.push("builtInExtensionsEnabledWithAutoUpdates must be an empty array, got " + JSON.stringify(p.builtInExtensionsEnabledWithAutoUpdates));
+            for (const key of ["defaultChatAgent", "trustedExtensionAuthAccess", "updateUrl", "tunnelApplicationConfig"])
+              if (key in p) problems.push(key + " must be absent, got " + JSON.stringify(p[key]));
+            if (problems.length) { problems.forEach(p => console.error("RESIDUE: " + p)); process.exit(1); }
+            console.log("product.json shapes ok");
+          ' app-root/resources/app/product.json
+
+      - name: --list-extensions must not throw
+        run: |
+          set -uo pipefail
+          exe=app-root/bin/picket-code
+          if ! "$exe" --list-extensions --show-versions > ext.txt 2> ext.err; then
+            echo "FAIL: --list-extensions exited non-zero"
+            cat ext.txt ext.err
+            exit 1
+          fi
+          if grep -qE 'is not iterable|Error scanning installed extensions|reading .extensionId' ext.err; then
+            echo "FAIL: the extension scanner still throws"
+            cat ext.err
+            exit 1
+          fi
+          echo "--list-extensions ok, user extensions installed: $(grep -c . ext.txt || true)"
+
+      - name: Start a real window and count activated extensions
+        run: |
+          set -uo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+          export DISPLAY=:99
+
+          profile=$(mktemp -d)
+          app-root/bin/picket-code \
+            --user-data-dir="$profile/data" \
+            --extensions-dir="$profile/ext" \
+            --disable-gpu --disable-dev-shm-usage --skip-welcome \
+            > "$profile/stdout.log" 2>&1 &
+          app_pid=$!
+          sleep 60
+          kill "$app_pid" 2>/dev/null || true
+          wait "$app_pid" 2>/dev/null || true
+
+          echo "--- log tree ---"
+          find "$profile/data/logs" -name '*.log' | sort || true
+
+          exthost=$(find "$profile/data/logs" -name 'exthost*.log' | head -1)
+          if [ -z "$exthost" ]; then
+            echo "FAIL: the extension host never wrote a log"
+            tail -40 "$profile/stdout.log"
+            exit 1
+          fi
+
+          activated=$(grep -c '_doActivateExtension' "$exthost" || true)
+          echo "activated extensions: $activated"
+          grep -o '_doActivateExtension [^,]*' "$exthost" | sed 's/_doActivateExtension //' | sort -u | head -20 || true
+
+          fail=0
+          if [ "$activated" -lt 5 ]; then
+            echo "FAIL: fewer than 5 built-in extensions activated"
+            fail=1
+          fi
+          hits=$(grep -hE 'is not iterable|Error scanning installed extensions|reading .extensionId|Error scanning' \
+            "$profile"/data/logs/*/*.log "$profile"/data/logs/*/*/*.log 2>/dev/null || true)
+          if [ -n "$hits" ]; then
+            echo "FAIL: regression signature found in the app log"
+            printf '%s\n' "$hits" | head -10
+            fail=1
+          fi
+          if [ "$fail" -eq 0 ]; then
+            echo "extensions load and the app log is clean"
+          fi
+          exit $fail
+
+  win32:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Resolve the tag
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${TAG_INPUT:-$TAG_FROM_RUN}"
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          echo "verifying $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download and unpack the published build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir dl
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*-win32-x64.zip' --pattern '*-SHA256SUMS' --dir dl --clobber
+          cd dl
+          # the checksum file also lists the linux asset, which is not downloaded here
+          sha256sum -c ./*-SHA256SUMS --ignore-missing
+          cd "$GITHUB_WORKSPACE"
+
+      - name: Unpack
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dl\*win32-x64.zip | Select-Object -First 1
+          Expand-Archive -Path $zip.FullName -DestinationPath . -Force
+          Get-ChildItem -Directory | Where-Object Name -like 'picket-code*'
+
+      - name: Assert the packaged product.json shapes
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const problems = [];
+            if (!Array.isArray(p.builtInExtensionsEnabledWithAutoUpdates) || p.builtInExtensionsEnabledWithAutoUpdates.length)
+              problems.push("builtInExtensionsEnabledWithAutoUpdates must be an empty array, got " + JSON.stringify(p.builtInExtensionsEnabledWithAutoUpdates));
+            for (const key of ["defaultChatAgent", "trustedExtensionAuthAccess", "updateUrl", "tunnelApplicationConfig"])
+              if (key in p) problems.push(key + " must be absent, got " + JSON.stringify(p[key]));
+            if (problems.length) { problems.forEach(p => console.error("RESIDUE: " + p)); process.exit(1); }
+            console.log("product.json shapes ok");
+          ' picket-code-win32-x64/resources/app/product.json
+
+      - name: --list-extensions must not throw
+        shell: bash
+        run: |
+          set -uo pipefail
+          cmd=picket-code-win32-x64/bin/picket-code.cmd
+          if ! "$cmd" --list-extensions --show-versions > ext.txt 2> ext.err; then
+            echo "FAIL: --list-extensions exited non-zero"
+            cat ext.txt ext.err
+            exit 1
+          fi
+          if grep -qE 'is not iterable|Error scanning installed extensions|reading .extensionId' ext.err; then
+            echo "FAIL: the extension scanner still throws"
+            cat ext.err
+            exit 1
+          fi
+          echo "--list-extensions ok, user extensions installed: $(grep -c . ext.txt || true)"
+
+      - name: Start a real window and count activated extensions
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE "picket-code-win32-x64"
+          $exe = (Get-ChildItem "$root\*.exe" | Where-Object {
+            $_.Name -notmatch 'ffmpeg|elevate|crashpad' } | Select-Object -First 1).FullName
+          $profile = Join-Path $env:RUNNER_TEMP "verify-profile"
+          Remove-Item $profile -Recurse -Force -ErrorAction SilentlyContinue
+
+          $p = Start-Process -FilePath $exe -PassThru -ArgumentList @(
+            "--user-data-dir=$profile\data", "--extensions-dir=$profile\ext",
+            "--disable-gpu", "--skip-welcome")
+          Start-Sleep -Seconds 60
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+
+          $logs = Join-Path $profile "data\logs"
+          $exthost = Get-ChildItem $logs -Recurse -Filter 'exthost*.log' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $exthost) { throw "FAIL: the extension host never wrote a log" }
+
+          $activated = (Select-String -Path $exthost.FullName -Pattern '_doActivateExtension').Count
+          "activated extensions: $activated"
+          (Select-String -Path $exthost.FullName -Pattern '_doActivateExtension ([^,]+)' -AllMatches |
+            ForEach-Object { $_.Matches.Value }) | Sort-Object -Unique | Select-Object -First 20
+
+          $fail = $false
+          if ($activated -lt 5) { "FAIL: fewer than 5 built-in extensions activated"; $fail = $true }
+          $hits = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+            Select-String -Pattern 'is not iterable|Error scanning installed extensions|reading .extensionId|Error scanning'
+          if ($hits) {
+            "FAIL: regression signature found in the app log"
+            $hits | Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
+            $fail = $true
+          }
+          if (-not $fail) { "extensions load and the app log is clean" }
+          if ($fail) { exit 1 }
