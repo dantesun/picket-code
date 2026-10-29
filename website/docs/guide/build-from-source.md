@@ -16,7 +16,7 @@ bash build/win32/package.sh <win32> [x64|arm64]     # Windows
 示例（`picket-code-version` 可写成标签形式，脚本会去掉前缀 `v`）：
 
 ```bash
-bash build/build.sh 1.143.1 v1.143.1-p1 linux x64
+bash build/build.sh 1.143.1 v1.143.1-p2 linux x64
 bash build/linux/package.sh linux x64
 ```
 

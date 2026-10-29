@@ -10,7 +10,7 @@ hero:
     alt: Picket Code
   actions:
     - theme: brand
-      text: 下载 v1.143.1-p1
+      text: 下载 v1.143.1-p2
       link: /guide/download
     - theme: alt
       text: 快速开始
@@ -149,7 +149,7 @@ hero:
   <div class="pc-step">
     <span class="pc-step-no">1</span>
     <h3>下载发行包</h3>
-    <p>从镜像站 <a href="https://picket-code.noware.cn/picket-code-v1.143.1-p1-win32-x64.zip"><code>picket-code.noware.cn</code></a>（或 <a href="https://github.com/dantesun/picket-code/releases">GitHub Releases</a>）获取对应平台的 <code>tar.gz</code> / <code>zip</code>，脚本自动完成 SHA256 校验。<a href="/guide/download">下载页</a> 有完整地址与校验命令。</p>
+    <p>从镜像站 <a href="https://picket-code.noware.cn/picket-code-v1.143.1-p2-win32-x64.zip"><code>picket-code.noware.cn</code></a>（或 <a href="https://github.com/dantesun/picket-code/releases">GitHub Releases</a>）获取对应平台的 <code>tar.gz</code> / <code>zip</code>，脚本自动完成 SHA256 校验。<a href="/guide/download">下载页</a> 有完整地址与校验命令。</p>
   </div>
   <div class="pc-step">
     <span class="pc-step-no">2</span>
@@ -177,9 +177,9 @@ hero:
       Linux (x64)
     </div>
     <ul>
-      <li>压缩包：<code>picket-code-v1.143.1-p1-linux-x64.tar.gz</code>（文件名带版本）</li>
+      <li>压缩包：<code>picket-code-v1.143.1-p2-linux-x64.tar.gz</code>（文件名带版本）</li>
       <li>启动：<code>./picket-code</code></li>
-      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p1-linux-x64.tar.gz">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
+      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p2-linux-x64.tar.gz">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
   </div>
   <div class="pc-dl-card">
@@ -188,9 +188,9 @@ hero:
       Windows (x64)
     </div>
     <ul>
-      <li>压缩包：<code>picket-code-v1.143.1-p1-win32-x64.zip</code>（文件名带版本）</li>
+      <li>压缩包：<code>picket-code-v1.143.1-p2-win32-x64.zip</code>（文件名带版本）</li>
       <li>启动：<code>Picket Code.exe</code></li>
-      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p1-win32-x64.zip">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
+      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p2-win32-x64.zip">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
   </div>
 </div>
@@ -219,9 +219,9 @@ hero:
 <div class="pc-cta">
   <div class="pc-cta-box">
     <h2>开始使用 Picket Code</h2>
-    <p>下载 v1.143.1-p1，或在 GitHub 上查看源码、提交 Issue、参与路线图。</p>
+    <p>下载 v1.143.1-p2，或在 GitHub 上查看源码、提交 Issue、参与路线图。</p>
     <div class="pc-cta-actions">
-      <a class="primary" href="/guide/download">下载 v1.143.1-p1</a>
+      <a class="primary" href="/guide/download">下载 v1.143.1-p2</a>
       <a class="ghost" href="https://github.com/dantesun/picket-code">GitHub 仓库</a>
       <a class="ghost" href="/project/roadmap">查看路线图</a>
     </div>

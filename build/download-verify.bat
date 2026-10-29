@@ -4,7 +4,7 @@ REM ============================================================
 REM  Picket Code download + SHA256 verify (Windows cmd)
 REM  Usage: download-verify.bat [TAG]
 REM  Example: download-verify.bat                       (latest GitHub release)
-REM           download-verify.bat v1.143.1-p1
+REM           download-verify.bat v1.143.1-p2
 REM
 REM  Artifacts are versioned: picket-code-<tag>-win32-<arch>.zip
 REM  and the checksum file is picket-code-<tag>-SHA256SUMS.

@@ -232,7 +232,10 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           # One file per matrix job: a plain checksum file would be overwritten by the
           # other job when the artifacts are merged with `merge-multiple`.
+          # Normalize to "<hash>  <name>": the Windows runner's sha256sum writes
+          # "<hash> *<name>" (binary marker), so the merged file stays uniform.
           sha256sum picket-code-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}.* \
+            | sed 's/ \*/  /' \
             > SHA256SUMS-${{ matrix.platform }}-${{ matrix.arch }}
 
       - name: Upload picket-code artifacts

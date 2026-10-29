@@ -29,10 +29,10 @@ versions ──► compile(linux) ──┐
 
 ## 触发方式
 
-- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p1`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p1` → `v1.143.1-p2`；工作流会剥掉 `-pN` 后定位上游 tag。
+- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p2`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p2` → `v1.143.1-p2`；工作流会剥掉 `-pN` 后定位上游 tag。
 - **手动触发**：`workflow_dispatch`，可指定上游版本与是否预发布。
 
-> `v1.143.1`（2026-10-27 发布）发行包有缺陷：ASAR 含 748 个重叠条目，会崩溃扩展宿主，该 Release 已删除。当前发行版是 `v1.143.1-p1`。
+> `v1.143.1`（2026-10-27 发布）发行包有缺陷：ASAR 含 748 个重叠条目，会崩溃扩展宿主，该 Release 已删除。当前发行版是 `v1.143.1-p2`。
 
 ## 版本策略
 
@@ -54,14 +54,14 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 直出对象）。示例（tag `v1.143.1-p1`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 直出对象）。示例（tag `v1.143.1-p2`）：
 
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-win32-x64.zip`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-linux-x64.tar.gz`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p1-SHA256SUMS`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p2-win32-x64.zip`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p2-linux-x64.tar.gz`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS`
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p1-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p2-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

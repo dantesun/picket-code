@@ -8,8 +8,8 @@
   curl 作为直连环境的兜底（-C - 续传）。
 .EXAMPLE
   .\download-verify.ps1
-  .\download-verify.ps1 -Tag v1.143.1-p1
-  .\download-verify.ps1 -Tag v1.143.1-p1 -OutDir D:\Downloads
+  .\download-verify.ps1 -Tag v1.143.1-p2
+  .\download-verify.ps1 -Tag v1.143.1-p2 -OutDir D:\Downloads
   .\download-verify.ps1 -ProxyCredential (Get-Credential)
 .NOTES
   不带 -Tag 时自动使用 GitHub 上最新的 release；产物名为
@@ -37,7 +37,7 @@ if (-not $Tag) {
   try {
     $Tag = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ "User-Agent" = "picket-code-downloader" }).tag_name
   } catch {
-    throw "无法确定最新版本，请显式传入 -Tag，例如: .\download-verify.ps1 -Tag v1.143.1-p1"
+    throw "无法确定最新版本，请显式传入 -Tag，例如: .\download-verify.ps1 -Tag v1.143.1-p2"
   }
 }
 if (-not $Tag) { throw "无法确定最新版本，请显式传入 -Tag" }

@@ -6,7 +6,7 @@
  * `/picket-code-*`, which is the naming scheme of the published artifacts, and
  * streams the object straight out of the `picket-releases` bucket.
  *
- * File names carry the version (`picket-code-v1.143.1-p1-win32-x64.zip`), so the
+ * File names carry the version (`picket-code-v1.143.1-p2-win32-x64.zip`), so the
  * body behind a given URL never changes and the response can be cached forever.
  */
 

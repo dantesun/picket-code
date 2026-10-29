@@ -10,7 +10,7 @@ on:
       tag:
         description: Release tag to migrate (assets only)
         required: true
-        default: v1.143.1-p1
+        default: v1.143.1-p2
       dry_run:
         description: Only print the planned changes
         type: boolean
