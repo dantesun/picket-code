@@ -15,7 +15,7 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 | Linux (x64) | `picket-code-v1.143.1-p3-linux-x64.tar.gz` | `./picket-code` |
 | Windows (x64) | `picket-code-v1.143.1-p3-win32-x64.zip` | `Picket Code.exe` |
 
-> 镜像保留最近 3 个版本，更早的版本只在 GitHub Releases；旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。解压出的顶层目录不带版本号：`picket-code-win32-x64/`、`picket-code-linux-x64/`。
+> 镜像保留最近 3 个版本，更早的版本不承诺长期可下载；旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。解压出的顶层目录不带版本号：`picket-code-win32-x64/`、`picket-code-linux-x64/`。
 
 ## 2. 解压
 

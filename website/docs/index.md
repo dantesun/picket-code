@@ -168,7 +168,7 @@ hero:
 <div class="pc-section">
 
 <h2 class="pc-title">平台支持与 <span>下载</span></h2>
-<p class="pc-sub">当前发行：Linux (x64) 与 Windows (x64)，tar.gz 与 zip 压缩包；macOS 与 ARM64 在 P0 验证闭环后加入。下载走 <code>https://picket-code.noware.cn</code>（保留最近 3 个版本，更早的版本只在 GitHub Releases）。</p>
+<p class="pc-sub">当前发行：Linux (x64) 与 Windows (x64)，tar.gz 与 zip 压缩包；macOS 与 ARM64 在 P0 验证闭环后加入。下载走 <code>https://picket-code.noware.cn</code>（保留最近 3 个版本，更早的版本不承诺长期可下载）。</p>
 
 <div class="pc-dl-grid">
   <div class="pc-dl-card">

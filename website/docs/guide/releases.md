@@ -1,6 +1,6 @@
 # 发行与版本
 
-> 推送 `v*` 标签（或手动 `workflow_dispatch`）触发 GitHub Actions 发行工作流，四段发行流水线自动产出双平台发行包，末尾的 `r2-sync` 任务再把资产镜像到 Cloudflare R2（保留最近 3 个版本）。
+> 推送 `v*` 标签（或手动 `workflow_dispatch`）触发 GitHub Actions 发行工作流，四段发行流水线自动产出双平台发行包，末尾的 `r2-sync` 任务再把资产镜像到 Cloudflare R2（保留最近 3 个版本）。发行成功后 `verify-release` 工作流自动把产物下载回 runner 做实机验证。
 
 ## 发行流水线
 
@@ -18,21 +18,39 @@ versions ──► compile(linux) ──┐
 | **package** | 按平台解包、重命名为 `picket-code-*`、归档并生成 `SHA256SUMS`；同时跑三项门禁（见下） |
 | **release** | 将产物发布到 GitHub Release，并把镜像地址写在 Release 说明顶部 |
 | **r2-sync** | `rclone copy` 当前 Release 资产到 Cloudflare R2 桶 `picket-releases`，再跑 `prune-r2.sh` 只保留最近 3 个版本 |
+| **verify-release** | 发行成功后自动触发（也可 `workflow_dispatch` 指定历史 tag）：下载产物 → 校验 `SHA256SUMS` → 断言 `product.json` 形状 → 跑 `--list-extensions` → 真实启动窗口并统计扩展宿主激活数量 |
+
+## 发行后验证
+
+`verify-release` 在 linux 与 win32 两条 runner 上各跑一遍，判据是**实测**而非"没报错"：
+
+- `product.json` 形状：`builtInExtensionsEnabledWithAutoUpdates` 必须为空数组；`defaultChatAgent`、`trustedExtensionAuthAccess`、`updateUrl`、`tunnelApplicationConfig` 必须不存在；
+- `--list-extensions --show-versions` 必须退出 0，且 stderr 不含 `is not iterable` / `Error scanning installed extensions` / `reading 'extensionId'`；
+- 启动真实窗口（linux 走 Xvfb，win32 走桌面）60 秒后，扩展宿主的 `exthost.log` 里 `_doActivateExtension` 至少 3 条且包含 `vscode.git`；
+- 全量应用日志不得出现上述三条错误签名。
 
 ## CI 门禁
 
 `package` 阶段失败即中止发行，三项断言与动态检查：
 
 - `node build/check-asar.mjs` 解析产出的 `node_modules.asar`，条目偏移重叠 / 数据区不匹配即失败；
-- 账号残留断言：`product.json` 不得含 `defaultChatAgent`、`trustedExtensionAuthAccess`、`builtInExtensionsEnabledWithAutoUpdates`，内置扩展目录不得含 `github` / `github-base` / `github-authentication` / `microsoft-authentication`；
-- 打包后的 Windows 应用实际启动 55 秒，日志命中 `ERR_INVALID_PACKAGE_CONFIG`、`Uncaught Exception`、`Could not locate the bindings file`、`Cannot find module` 任一即失败。
+- 账号残留断言：`product.json` 不得含 `defaultChatAgent`、`trustedExtensionAuthAccess`、`updateUrl`，且 `builtInExtensionsEnabledWithAutoUpdates` 必须为空数组（上游代码对它裸 `for…of`，缺失或 `null` 会让扩展扫描器构造时抛错）；内置扩展目录不得含 `github` / `github-base` / `github-authentication` / `microsoft-authentication`，发行包不得携带 copilot shim；
+- 打包后的 Windows 应用实际启动 55 秒，日志命中 `ERR_INVALID_PACKAGE_CONFIG`、`Uncaught Exception`、`Could not locate the bindings file`、`Cannot find module`、`is not iterable`、`Error scanning installed extensions`、`reading 'extensionId'` 任一即失败。
 
 ## 触发方式
 
 - **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p3`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p1` → `v1.143.1-p2` → `v1.143.1-p3`；工作流会剥掉 `-pN` 后定位上游 tag。
 - **手动触发**：`workflow_dispatch`，可指定上游版本与是否预发布。
 
-> `v1.143.1`（2026-10-27 发布）发行包有缺陷：ASAR 含 748 个重叠条目，会崩溃扩展宿主，该 Release 已删除。当前发行版是 `v1.143.1-p3`。
+> 历史：`v1.143.1`（2026-10-27）ASAR 含 748 个重叠条目，会崩溃扩展宿主；`v1.143.1-p1` / `v1.143.1-p2` 因 `product.json` 两个字段被写成 `null` / `{}`，扩展扫描器构造即抛错，装上后不加载任何扩展（连 `--list-extensions` 都失败）。三个版本均已删除，当前唯一发行版是 `v1.143.1-p3`。
+
+## 当前版本 v1.143.1-p3
+
+- `builtInExtensionsEnabledWithAutoUpdates` 恢复为上游类型（空数组），`tunnelApplicationConfig` 整个键移除 → 扩展扫描器不再崩，用户扩展与内置扩展都可加载；
+- `apply-patches.sh` 新增形状守卫（`build/check-product-shapes.py`）：覆盖项类型不符、删除上游数组/对象键未登记守卫、新增上游不存在的空容器，都会让构建失败；
+- 无默认账户提供方时释放 `initBarrier`，GitHub 相关视图不再永远转圈，账户策略门禁不再停在 Inactive；
+- 状态栏 Copilot 图标与看板、Welcome 的 "Use AI features with Copilot for free" 步骤、终端命令文案里的 `copilot` 均已消失（`ChatContextKeys.Setup.hidden` 未动，MCP 命令不受影响）；
+- linux 与 win32 runner 实测：`--list-extensions` 退出 0，`exthost.log` 中 `vscode.git` 等 5 个启动期内置扩展完成激活，应用日志无错误签名。
 
 ## 版本策略
 
@@ -65,7 +83,7 @@ curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SH
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-- 镜像保留最近 **3 个版本**，更早的版本只在 GitHub Releases；
+- 镜像保留最近 **3 个版本**，更早的版本不承诺长期可下载；
 - 没有 `latest` 别名：文件名含版本，一个 URL 的内容永不改变，因此 URL 永久有效且可长期缓存（`cache-control: immutable`）；
 - 旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容，请求返回 404。
 

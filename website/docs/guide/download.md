@@ -1,6 +1,6 @@
 # 下载与安装
 
-> 当前版本：**v1.143.1-p3**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
+> 当前版本：**v1.143.1-p3**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
 
 ## 版本标签与产物
 
@@ -34,7 +34,7 @@
 
 同一版本的同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上。
 
-> 镜像保留最近 **3 个版本**，更早的版本只在 GitHub Releases。
+> 镜像保留最近 **3 个版本**，更早的版本不承诺长期可下载。
 > 旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容，请求返回 404。
 > 文件名含版本，因此每个 URL 的内容永不改变：可以永久引用、长期缓存。
 
@@ -107,10 +107,10 @@ Get-FileHash .\picket-code-v1.143.1-p3-win32-x64.zip -Algorithm SHA256
 ## 常见问题
 
 **Q：下载 GitHub 附件慢怎么办？**
-优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本回 GitHub Releases。
+优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本不承诺长期可下载。
 
 **Q：如何换版本？**
-把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p3`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本只在 GitHub Releases。
+把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p3`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本不承诺长期可下载。
 
 **Q：为什么下载 URL 里带版本号？**
 文件名带版本，一个 URL 背后的内容永不改变，因此可以永久引用并长期缓存；也正因如此，旧的固定 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。

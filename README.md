@@ -34,7 +34,7 @@ sha256sum -c --ignore-missing SHA256SUMS
 
 解压后运行 `picket-code`（Linux）或 `Picket Code.exe`（Windows）；归档内的顶层目录不含版本号，仍是 `picket-code-win32-x64/`（Windows）与 `picket-code-linux-x64/`（Linux）。
 
-- 镜像保留最近 **3 个版本**，更早的版本只在 GitHub [Releases](https://github.com/dantesun/picket-code/releases)；
+- 镜像保留最近 **3 个版本**，更早的版本不承诺长期可下载；
 - 旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容，访问返回 404；
 - 文件名含版本，因此下载 URL 永久有效且可长期缓存。
 

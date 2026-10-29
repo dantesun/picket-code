@@ -10,7 +10,7 @@
    - Windows (x64): https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip
    - Linux (x64): https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz
    - 校验和: https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS
-   同一版本的同名资产也在 GitHub Releases 上（镜像只保留最近 3 个版本，更早的版本只在 GitHub Releases）：
+   同一版本的同名资产也在 GitHub Releases 上（镜像只保留最近 3 个版本，更早的版本不承诺长期可下载）：
    https://github.com/dantesun/picket-code/releases
    注意：旧的无版本 URL（/picket-code-win32-x64.zip、/SHA256SUMS）已废弃，不提供兼容，请求返回 404，不要使用。
 2. 校验 SHA256（文件名含版本，URL 永久有效且可缓存，但校验值必须与该版本 SHA256SUMS 比对）：

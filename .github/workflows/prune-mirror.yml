@@ -1,0 +1,59 @@
+name: prune mirror (manual)
+
+# Maintenance: delete every published version from the R2 mirror except the
+# newest N. Runs inside Actions so the storage credentials never have to exist
+# on a developer machine. Only keys matching `picket-code-<tag>-*` are touched;
+# the checksum file of a kept version, screenshots and other assets survive.
+#
+# Defaults to a dry run, so an accidental dispatch reports instead of deleting.
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: Number of versions to keep
+        required: false
+        default: '3'
+      dry_run:
+        description: Only report what would be deleted
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Install rclone
+        run: |
+          curl -fsSL -o rclone.deb https://downloads.rclone.org/rclone-current-linux-amd64.deb
+          sudo dpkg -i rclone.deb
+          rclone version
+
+      - name: Show what is in the bucket
+        run: rclone lsl r2:picket-releases/ || true
+
+      - name: Prune
+        env:
+          KEEP: ${{ inputs.keep }}
+          PRUNE_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          echo "keep=$KEEP dry_run=$PRUNE_DRY_RUN"
+          bash .github/scripts/prune-r2.sh
+
+      - name: Show the result
+        run: rclone lsl r2:picket-releases/ || true

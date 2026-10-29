@@ -86,7 +86,7 @@ git push
 
 - 桶：`picket-releases`（Worker 用 `RELEASES` 绑定）；
 - 上传：`release.yml` 的 `r2-sync` 任务从已发布的 Release 下载 `picket-code-*` 资产，`rclone copy release/ r2:picket-releases/`（用 `copy` 而非 `sync`，避免删除历史版本）；
-- 保留：`.github/scripts/prune-r2.sh` 只保留最近 **3 个版本**（`KEEP=3`，按 tag 的 `vX.Y.Z` + `-pN` 排序），更早的版本只在 GitHub Releases；
+- 保留：`.github/scripts/prune-r2.sh` 只保留最近 **3 个版本**（`KEEP=3`，按 tag 的 `vX.Y.Z` + `-pN` 排序），更早的版本不承诺长期可下载；
 - 凭据：GitHub Secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT`。
 
 ### 3. 下载 Worker

@@ -4,7 +4,7 @@
 
 > 当前版本：**v1.143.1-p3**（上游 VS Code `1.143.1`）。
 > 脚本不带版本参数时自动解析 GitHub 上最新的 release；显式传入标签（如 `v1.143.1-p3`）同样支持。
-> 发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本只在 GitHub Releases）。
+> 发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
 > 脚本自带：显式进度（curl 进度条 / 百分比）、失败自动重试 5 次、断点续传（服务器支持 Range 时）。
 
 ---
@@ -56,7 +56,7 @@ sha256sum -c --ignore-missing SHA256SUMS
 ```
 
 > 旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容，请求返回 404。
-> 镜像保留最近 3 个版本；更早的版本只在 GitHub Releases。
+> 镜像保留最近 3 个版本；更早的版本不承诺长期可下载。
 > 文件名含版本，所以下载 URL 永久有效且可长期缓存。
 
 ---
