@@ -17,6 +17,20 @@ if [ -z "$base" ]; then
 fi
 
 gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq '.body // ""' > generated.md
+# Drop the section a previous run (or the migration workflow) left behind, so the
+# table is never stacked twice.
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path('generated.md')
+body = p.read_text(encoding='utf-8')
+while body.lstrip().startswith('## 下载地址'):
+	parts = body.split('\n---\n', 1)
+	if len(parts) != 2:
+		body = ''
+		break
+	body = parts[1].lstrip('\n')
+p.write_text(body, encoding='utf-8')
+PY
 sums="picket-code-${tag}-SHA256SUMS"
 {
 	echo '## 下载地址'
