@@ -22,9 +22,12 @@
 #     registrations that replace the Copilot-backed implementations.
 #   - 61 : build-script adaptations (dirs.ts / gulpfile filters, AppX + signtool
 #     tolerance, built-in extensions from GitHub). Supersedes patch-vscode.py.
-#   - 58 : `defaultAccount.ts` tolerates a build without `defaultChatAgent`
-#     (product.json no longer defines it, so no default-account provider is
-#     registered and the account UI keeps no dangling Copilot entry).
+#   - 58 : the workbench runs with a `product.json` that has no `defaultChatAgent`.
+#     `defaultAccount.ts` returns a neutral config and skips registering the
+#     default-account provider; the onboarding wizard stays closed instead of
+#     asserting at import time; the chat welcome text, the chat status dashboard and
+#     the extension-management "is this the chat extension?" checks treat a missing
+#     agent as "no chat extension" rather than dereferencing `undefined`.
 53-ext-copilot-remove-it.patch
 54-picket-code-disable-node-compile-cache.patch
 56-asar-serialize-inserts.patch

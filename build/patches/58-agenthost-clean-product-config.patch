@@ -41,3 +41,164 @@ index b505994a112..e1eab2ab889 100644
  		const defaultAccountProvider = this._register(instantiationService.createInstance(DefaultAccountProvider, toDefaultAccountConfig(productService.defaultChatAgent)));
  		defaultAccountService.setDefaultAccountProvider(defaultAccountProvider);
  	}
+diff --git a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
+index 3670af7480a..997ffb91ce8 100644
+--- a/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
++++ b/src/vs/platform/extensionManagement/common/abstractExtensionManagementService.ts
+@@ -992,7 +992,8 @@ export abstract class AbstractExtensionManagementService extends CommontExtensio
+ 		if (checked.indexOf(extension) !== -1) {
+ 			return [];
+ 		}
+-		if (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {
++		const defaultChatAgentExtensionId = this.productService.defaultChatAgent?.extensionId;
++		if (defaultChatAgentExtensionId && areSameExtensions(extension.identifier, { id: defaultChatAgentExtensionId })) {
+ 			return [];
+ 		}
+ 		checked.push(extension);
+diff --git a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
+index bd1e67ecf9c..3c0c3d8b5d5 100644
+--- a/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
++++ b/src/vs/platform/extensionManagement/common/extensionGalleryService.ts
+@@ -1217,10 +1217,11 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+ 
+ 			const result: IGalleryExtension[] = [];
+ 			let defaultChatAgentExtension: IGalleryExtension | undefined;
++			const defaultChatAgentExtensionId = this.productService.defaultChatAgent?.extensionId;
+ 			for (let index = 0; index < extensions.length; index++) {
+ 				const extension = extensions[index];
+ 				setTelemetry(extension, ((query.pageNumber - 1) * query.pageSize) + index, options.source);
+-				if (areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId, })) {
++				if (defaultChatAgentExtensionId && areSameExtensions(extension.identifier, { id: defaultChatAgentExtensionId, })) {
+ 					defaultChatAgentExtension = extension;
+ 				} else {
+ 					result.push(extension);
+@@ -2043,15 +2044,18 @@ export abstract class AbstractExtensionGalleryService implements IExtensionGalle
+ 			}
+ 		}
+ 
+-		deprecated[this.productService.defaultChatAgent.extensionId.toLowerCase()] = {
+-			disallowInstall: true,
+-			extension: {
+-				id: this.productService.defaultChatAgent.chatExtensionId,
+-				displayName: 'GitHub Copilot Chat',
+-				autoMigrate: { storage: false, donotDisable: true },
+-				preRelease: this.productService.quality !== 'stable'
+-			}
+-		};
++		const defaultChatAgent = this.productService.defaultChatAgent;
++		if (defaultChatAgent) {
++			deprecated[defaultChatAgent.extensionId.toLowerCase()] = {
++				disallowInstall: true,
++				extension: {
++					id: defaultChatAgent.chatExtensionId,
++					displayName: 'GitHub Copilot Chat',
++					autoMigrate: { storage: false, donotDisable: true },
++					preRelease: this.productService.quality !== 'stable'
++				}
++			};
++		}
+ 
+ 		return { malicious, deprecated, search, autoUpdate };
+ 	}
+diff --git a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
+index ebe916fe9b6..bfd951d08c0 100644
+--- a/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
++++ b/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { $, append, EventType, addDisposableListener, EventHelper, disposableWindowInterval, getWindow } from '../../../../../base/browser/dom.js';
++import type { IDefaultChatAgent } from '../../../../../base/common/product.js';
+ import { Gesture, EventType as TouchEventType } from '../../../../../base/browser/touch.js';
+ import { ActionBar } from '../../../../../base/browser/ui/actionbar/actionbar.js';
+ import { renderLabelWithIcons } from '../../../../../base/browser/ui/iconLabel/iconLabels.js';
+@@ -48,7 +49,16 @@ import { GitHubPaths, IDefaultAccountService } from '../../../../../platform/def
+ import product from '../../../../../platform/product/common/product.js';
+ import { isCompletionsEnabled } from '../../../../../editor/common/services/completionsEnablement.js';
+ 
+-const defaultChat = product.defaultChatAgent;
++// this build ships without the default chat agent: the Copilot-specific quick settings below
++// read names, URLs and setting ids from it, so fall back to neutral values instead of
++// dereferencing an undefined product entry when the status tooltip is opened.
++const defaultChat = product.defaultChatAgent ?? {
++	provider: { default: { id: '', name: '' } },
++	termsStatementUrl: '',
++	privacyStatementUrl: '',
++	completionsEnablementSetting: '',
++	nextEditSuggestionsSetting: '',
++} as IDefaultChatAgent;
+ const completionsConfigurationTargets = [
+ 	ConfigurationTarget.WORKSPACE_FOLDER,
+ 	ConfigurationTarget.WORKSPACE,
+diff --git a/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts b/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts
+index e2bd4dd731c..8298e87bb6a 100644
+--- a/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts
++++ b/src/vs/workbench/contrib/chat/browser/widget/chatWidget.ts
+@@ -1662,9 +1662,11 @@ export class ChatWidget extends Disposable implements IChatWidget {
+ 			if (!numItems) {
+ 				const defaultAgent = this.chatAgentService.getDefaultAgent(this.location, this.input.currentModeKind);
+ 				let additionalMessage: string | IMarkdownString | undefined;
+-				if (this.chatEntitlementService.anonymous && !this.chatEntitlementService.sentiment.completed) {
+-					const providers = product.defaultChatAgent.provider;
+-					additionalMessage = new MarkdownString(localize({ key: 'settings', comment: ['{Locked="]({2})"}', '{Locked="]({3})"}'] }, "By continuing with {0} Copilot, you agree to {1}'s [Terms]({2}) and [Privacy Statement]({3}).", providers.default.name, providers.default.name, product.defaultChatAgent.termsStatementUrl, product.defaultChatAgent.privacyStatementUrl), { isTrusted: true });
++				// this build ships without the default chat agent: no agreement text to show
++				const defaultChatAgent = product.defaultChatAgent;
++				if (defaultChatAgent && this.chatEntitlementService.anonymous && !this.chatEntitlementService.sentiment.completed) {
++					const providers = defaultChatAgent.provider;
++					additionalMessage = new MarkdownString(localize({ key: 'settings', comment: ['{Locked="]({2})"}', '{Locked="]({3})"}'] }, "By continuing with {0} Copilot, you agree to {1}'s [Terms]({2}) and [Privacy Statement]({3}).", providers.default.name, providers.default.name, defaultChatAgent.termsStatementUrl, defaultChatAgent.privacyStatementUrl), { isTrusted: true });
+ 				} else {
+ 					additionalMessage = defaultAgent?.metadata.additionalWelcomeMessage;
+ 				}
+diff --git a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
+index 7d9de121739..22adf834f47 100644
+--- a/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
++++ b/src/vs/workbench/contrib/extensions/browser/extensionsWorkbenchService.ts
+@@ -2851,7 +2851,8 @@ export class ExtensionsWorkbenchService extends Disposable implements IExtension
+ 		}
+ 
+ 		const extensionsToUninstall: UninstallExtensionInfo[] = [{ extension: extension.local }];
+-		if (!areSameExtensions(extension.identifier, { id: this.productService.defaultChatAgent.extensionId })) {
++		const defaultChatAgentExtensionId = this.productService.defaultChatAgent?.extensionId;
++		if (!defaultChatAgentExtensionId || !areSameExtensions(extension.identifier, { id: defaultChatAgentExtensionId })) {
+ 			for (const packExtension of this.getAllPackedExtensions(extension, this.local)) {
+ 				if (packExtension.local && !extensionsToUninstall.some(e => areSameExtensions(e.extension.identifier, packExtension.identifier))) {
+ 					extensionsToUninstall.push({ extension: packExtension.local });
+diff --git a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
+index ff993368801..c45d55c4a8a 100644
+--- a/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
++++ b/src/vs/workbench/contrib/welcomeOnboarding/browser/onboardingVariationA.ts
+@@ -10,7 +10,6 @@ import { isCancellationError } from '../../../../base/common/errors.js';
+ import { StopWatch } from '../../../../base/common/stopwatch.js';
+ import { URI } from '../../../../base/common/uri.js';
+ import { isWindows, isMacintosh, isLinux } from '../../../../base/common/platform.js';
+-import { assertDefined } from '../../../../base/common/types.js';
+ import { FileAccess } from '../../../../base/common/network.js';
+ import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
+ import { KeyCode } from '../../../../base/common/keyCodes.js';
+@@ -78,8 +77,10 @@ type OnboardingActionEvent = {
+ 
+ type EnterpriseSignInUiState = 'options' | 'instance' | 'progress';
+ 
+-assertDefined(product.defaultChatAgent, 'Onboarding requires a default chat agent product configuration.');
+-const defaultChat = product.defaultChatAgent;
++// this build ships without the default chat agent: the wizard is never opened (see show()),
++// but the module still has to evaluate while the workbench loads, so the product value is
++// read without asserting and every read below only happens inside a rendered wizard.
++const defaultChat = product.defaultChatAgent!;
+ 
+ /**
+  * Variation A — Classic Wizard Modal
+@@ -174,6 +175,13 @@ export class OnboardingVariationA extends Disposable implements IOnboardingServi
+ 			return;
+ 		}
+ 
++		// this build ships without the default chat agent: the wizard is built around signing
++		// in to it, so it stays closed instead of offering providers that do not exist.
++		if (!product.defaultChatAgent) {
++			this._onDidDismiss.fire();
++			return;
++		}
++
+ 		this._isShowing = true;
+ 		this.previouslyFocusedElement = getActiveWindow().document.activeElement as HTMLElement | undefined;
+ 
