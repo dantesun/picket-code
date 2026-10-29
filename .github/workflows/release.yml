@@ -230,6 +230,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      # `gh release view/edit` shell out to git when they cannot resolve the repo
+      # from flags, so give the job a real checkout instead of relying on that.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
