@@ -1,0 +1,56 @@
+name: Migrate R2 bucket
+
+# One-off maintenance workflow: copies every object from one bucket to another
+# inside the same account. Used to move the release objects to a bucket whose
+# primary location sits next to the Cloudflare edge that serves them (the
+# download worker runs on the west-coast edge; an APAC bucket means every
+# uncached byte crosses the Pacific twice).
+#
+# `copy`, never `sync`: the source stays intact until the new bucket has been
+# verified and the worker has been switched over.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source bucket"
+        required: true
+        default: picket-releases
+      target:
+        description: "Target bucket"
+        required: true
+        default: picket-releases-wnam
+
+permissions:
+  contents: read
+
+jobs:
+  copy:
+    name: rclone copy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SOURCE: ${{ inputs.source }}
+      TARGET: ${{ inputs.target }}
+    steps:
+      - name: Install rclone
+        run: |
+          curl -fsSL -o rclone.deb https://downloads.rclone.org/rclone-current-linux-amd64.deb
+          sudo dpkg -i rclone.deb
+          rclone version | head -1
+
+      - name: Show source
+        run: rclone lsl "r2:${SOURCE}/"
+
+      - name: Copy source to target
+        run: rclone copy --s3-no-check-bucket --transfers 8 --checkers 16 --progress "r2:${SOURCE}/" "r2:${TARGET}/"
+
+      - name: Show target
+        run: rclone lsl "r2:${TARGET}/"
+
+      - name: Compare hashes
+        run: rclone check --s3-no-check-bucket "r2:${SOURCE}/" "r2:${TARGET}/"
