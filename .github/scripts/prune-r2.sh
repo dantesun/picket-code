@@ -51,7 +51,7 @@ fi
 drop="$(printf '%s\n' "$versions" | head -n $((total - KEEP)))"
 
 # Compare the whole version, not a prefix: `picket-code-v1.143.1-` would also match
-# the v1.143.1-p1 and v1.143.1-p2 objects.
+# the `v1.143.1-pN` objects.
 object_version() {
 	printf '%s' "$1" | sed -E 's/^picket-code-(v[0-9]+\.[0-9]+\.[0-9]+(-p[0-9]+)?)-.*/\1/'
 }
