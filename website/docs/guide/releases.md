@@ -78,7 +78,7 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 直出对象）。示例（tag `v1.143.1-p4`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 提供）。对象在某个位置首次下载后进入 Cloudflare 边缘缓存，响应头 `x-picket-cache: HIT` 表示本次由边缘直接返回、没有再回源 R2。示例（tag `v1.143.1-p4`）：
 
 - `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
 - `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`

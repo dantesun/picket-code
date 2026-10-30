@@ -1,8 +1,9 @@
-name: Net probe (temporary)
+name: Net probe
 
-# Measures the download path from a GitHub runner rather than from a laptop, so
-# the numbers are not coloured by a local proxy. Delete once the mirror question
-# is settled.
+# Measures the download path from a GitHub runner rather than from a laptop, so the
+# numbers are not coloured by a local proxy. Run it by hand when a download is
+# reported as slow: it prints throughput for the mirror, the Cloudflare speed
+# endpoint and the GitHub release side by side, plus the cache headers.
 on:
   workflow_dispatch:
     inputs:

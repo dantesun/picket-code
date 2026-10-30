@@ -93,6 +93,7 @@ git push
 
 - 代码：`infra/worker/download`（`wrangler.toml`：worker 名 `picket-downloads`，路由 `picket-code.noware.cn/picket-code-*`，zone `noware.cn`，R2 绑定 `RELEASES` → `picket-releases`）；
 - 行为：只接受 `GET` / `HEAD`，只服务以 `picket-code-` 开头且不含 `..` 的键，支持 Range（断点续传），未命中即 404；
+- 缓存：Cloudflare 默认**不缓存 Worker 响应**，因此完整 GET 会写入边缘缓存（`caches.default`，键为 URL），R2 只在每个位置的首次下载时被读一次；响应头 `x-picket-cache: HIT|MISS` 说明本次是否是边缘直出。Range 请求与 HEAD 不入缓存。填充缓存用**第二次 R2 读取**而不是 `tee` 客户端响应，避免慢客户端把 200 MB 的差值堆在 Worker 内存里；`cache.put` 失败不影响下载；
 - 部署：**只从 CI 部署**——`.github/workflows/deploy-worker.yml` 在 `infra/worker/download/**` 或该 workflow 自身变更时，以及手动 `workflow_dispatch` 时执行 `wrangler deploy`。
 
 > **不要在本地 `wrangler deploy`**：Cloudflare API Token 只存在 GitHub Actions（Secret `CF_API_TOKEN`，Account ID 取仓库变量 `CF_ACCOUNT_ID`），本地部署会绕开唯一的凭据来源与审计路径。改完 worker 代码后 push 或手动触发该 workflow 即可。
