@@ -38,7 +38,7 @@ jobs:
                 -w 'speed=%{speed_download}B/s got=%{size_download} ttfb=%{time_starttransfer}s\n' "$url" || true
             done
             echo "--- headers ---"
-            curl -sI --max-time 20 "$ZIP" | grep -iE 'cf-ray|cf-cache-status|x-picket-cache|age:' || true
+            curl -sI --max-time 20 "$ZIP" | grep -iE 'cf-ray|cf-cache-status|age:|cache-control|content-type' || true
           done
 
       - name: Single-range reads

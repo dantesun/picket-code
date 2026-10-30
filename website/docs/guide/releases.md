@@ -78,7 +78,7 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 R2 自定义域名 `https://download.noware.cn` 提供（文档站仍在 `https://picket-code.noware.cn`）。该主机名是 R2 桶的自定义域名，对象由 R2 直接返回（`cf-cache-status: DYNAMIC`，即不经 Cloudflare 边缘缓存），因此每次下载都会读取 R2，但省掉了 Worker 这一跳。示例（tag `v1.143.1-p4`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 R2 自定义域名 `https://download.noware.cn` 提供（文档站仍在 `https://picket-code.noware.cn`）。该主机名是 R2 桶的自定义域名，对象由 R2 直接返回（`cf-cache-status: DYNAMIC`，即不经 Cloudflare 边缘缓存），因此每次下载都会读取 R2。示例（tag `v1.143.1-p4`）：
 
 - `https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
 - `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`

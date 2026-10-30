@@ -353,9 +353,21 @@ jobs:
           rclone version
 
       # `copy`, never `sync`: the bucket now holds several versions, and older ones
-      # are removed only by the explicit prune below.
+      # are removed only by the explicit prune below. The checksum file goes up
+      # separately: rclone falls back to application/octet-stream for names
+      # without an extension, which makes browsers download it instead of showing
+      # it. Every object is version-named, so the cache headers can be immutable.
       - name: Upload release artifacts to R2
-        run: rclone copy --s3-no-check-bucket release/ r2:picket-releases/ --progress
+        run: |
+          set -euo pipefail
+          rclone copy --s3-no-check-bucket --exclude '*-SHA256SUMS' \
+            --header-upload "Cache-Control: public, max-age=31536000, immutable" \
+            release/ r2:picket-releases/ --progress
+          sums="$(ls release/*-SHA256SUMS)"
+          rclone copyto --s3-no-check-bucket --ignore-times \
+            --header-upload "Content-Type: text/plain; charset=utf-8" \
+            --header-upload "Cache-Control: public, max-age=31536000, immutable" \
+            "$sums" "r2:picket-releases/$(basename "$sums")"
 
       - name: Prune R2 (keep 3 versions)
         run: bash .github/scripts/prune-r2.sh

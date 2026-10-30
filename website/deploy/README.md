@@ -7,7 +7,7 @@ Picket Code 官网是纯静态站点（VitePress 构建产物），托管在 **C
 ## 总体架构
 
 ```
-GitHub（源码 + website/ 站点 + infra/worker/download）
+GitHub（源码 + website/ 站点）
     │ push 触发
     ├──────────────► Cloudflare Pages（构建 VitePress 静态站点）
     │                     │ 自定义域名
@@ -27,7 +27,7 @@ GitHub（源码 + website/ 站点 + infra/worker/download）
 | `picket-code.noware.cn` | Cloudflare Pages（`picket-code` 项目） | VitePress 文档站 |
 | `download.noware.cn` | R2 桶 `picket-releases` 的自定义域名 | 发行包与 `SHA256SUMS`（路径 `/picket-code-*`） |
 
-文档站里所有下载链接都指向 `download.noware.cn`。`picket-code.noware.cn/picket-code-*` 仍由历史 Worker `picket-downloads` 服务（见"下载 Worker"一节），保留它只是为了旧链接不失效。
+文档站里所有下载链接都指向 `download.noware.cn`；`picket-code.noware.cn` 只提供文档站，`/picket-code-*` 之类路径返回 404。
 
 ## 一、把站点放进仓库
 
@@ -70,7 +70,7 @@ git push
 3. 保存后 Cloudflare 自动为域名签发 SSL 证书（Google CA，约 1–15 分钟），状态从 pending → active；
 4. 生效后即可通过 `https://picket-code.noware.cn` 访问（已完成，证书有效期至 2027-01-26）。
 
-## 四、下载资源：R2 桶 + 下载 Worker（已落地）
+## 四、下载资源：R2 桶 + 自定义域名（已落地）
 
 ### 1. 下载地址的形式
 
@@ -80,29 +80,19 @@ git push
 - `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
 - `https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
 
-因为文件名含版本，一个 URL 对应的对象永不覆盖，Worker 因此返回 `cache-control: public, max-age=31536000, immutable`，可被 CDN 与客户端长期缓存。桶里**没有** `latest` 别名，旧的无版本对象（`picket-code-win32-x64.zip`、`SHA256SUMS`）已删除且不再生成，请求返回 404（不提供兼容）。
+因为文件名含版本，一个 URL 对应的对象永不覆盖，上传时即带 `cache-control: public, max-age=31536000, immutable`，可被 CDN 与客户端长期缓存。`SHA256SUMS` 另带 `content-type: text/plain; charset=utf-8`，浏览器直接显示而不是下载。桶里**没有** `latest` 别名，旧的无版本对象（`picket-code-win32-x64.zip`、`SHA256SUMS`）已删除且不再生成，请求返回 404（不提供兼容）。
 
 ### 2. R2 桶与保留策略
 
-- 桶：`picket-releases`（Worker 用 `RELEASES` 绑定）；
-- 上传：`release.yml` 的 `r2-sync` 任务从已发布的 Release 下载 `picket-code-*` 资产，`rclone copy release/ r2:picket-releases/`（用 `copy` 而非 `sync`，避免删除历史版本）；
+- 桶：`picket-releases`，绑定自定义域名 `download.noware.cn`；
+- 上传：`release.yml` 的 `r2-sync` 任务从已发布的 Release 下载 `picket-code-*` 资产，`rclone copy release/ r2:picket-releases/`（用 `copy` 而非 `sync`，避免删除历史版本）；`SHA256SUMS` 单独用 `rclone copyto` 上传，以便带上 `content-type` 与 `cache-control` 头；
 - 保留：`.github/scripts/prune-r2.sh` 只保留最近 **3 个版本**（`KEEP=3`，按 tag 的 `vX.Y.Z` + `-pN` 排序），更早的版本不承诺长期可下载；
-- 凭据：GitHub Secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT`。
-
-### 3. 下载 Worker（历史路径）
-
-> **当前下载走 R2 自定义域名 `download.noware.cn`，不再经过这个 Worker。** 实测同一台机器、同一时刻：R2 直出约 1.2 MB/s，Worker 路径约 5 KB/s——Worker 多了一跳且要自己搬流，反而更慢。Worker 保留只为让 `picket-code.noware.cn/picket-code-*` 这类旧链接继续可用。
-
-- 代码：`infra/worker/download`（`wrangler.toml`：worker 名 `picket-downloads`，路由 `picket-code.noware.cn/picket-code-*`，zone `noware.cn`，R2 绑定 `RELEASES` → `picket-releases`）；
-- 行为：只接受 `GET` / `HEAD`，只服务以 `picket-code-` 开头且不含 `..` 的键，支持 Range（断点续传），未命中即 404；
-- 缓存：Cloudflare 默认**不缓存 Worker 响应**，因此完整 GET 会写入边缘缓存（`caches.default`，键为 URL），R2 只在每个位置的首次下载时被读一次；响应头 `x-picket-cache: HIT|MISS` 说明本次是否是边缘直出。Range 请求与 HEAD 不入缓存。填充缓存用**第二次 R2 读取**而不是 `tee` 客户端响应，避免慢客户端把 200 MB 的差值堆在 Worker 内存里；`cache.put` 失败不影响下载；
-- 部署：**只从 CI 部署**——`.github/workflows/deploy-worker.yml` 在 `infra/worker/download/**` 或该 workflow 自身变更时，以及手动 `workflow_dispatch` 时执行 `wrangler deploy`。
-
-> **不要在本地 `wrangler deploy`**：Cloudflare API Token 只存在 GitHub Actions（Secret `CF_API_TOKEN`，Account ID 取仓库变量 `CF_ACCOUNT_ID`），本地部署会绕开唯一的凭据来源与审计路径。改完 worker 代码后 push 或手动触发该 workflow 即可。
+- 凭据：GitHub Secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT`；
+- 边缘缓存：R2 自定义域名的响应默认是 `cf-cache-status: DYNAMIC`（Cloudflare **不缓存**），每次下载都读 R2 一次。要让下载命中 Cloudflare 边缘缓存，需在 zone `noware.cn` 上加一条 Cache Rule（表达式 `http.host eq "download.noware.cn"`，开启 Cache eligibility: Eligible for cache、Edge TTL: 1 year）；这属于控制台/Zone 权限，不在 CI 里做。
 
 ## 五、备用方案：Wrangler 直接上传站点
 
-不想接 Git 时，可用 Wrangler 直接上传 Pages 构建产物（`wrangler.toml.example`）。注意这只适用于**站点**，下载 Worker 仍只从 CI 部署（见上节）：
+不想接 Git 时，可用 Wrangler 直接上传 Pages 构建产物（`wrangler.toml.example`）。这只影响站点，发行包仍由 `release.yml` 同步到 R2：
 
 ```bash
 npm install -g wrangler
@@ -117,7 +107,7 @@ wrangler pages deploy docs/.vitepress/dist --project-name=picket-code
 
 | Secret | 说明 |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限：Workers Scripts Edit / Pages Edit） |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限：Pages Edit） |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 ID |
 
 ## 站点内的下载链接与变量
