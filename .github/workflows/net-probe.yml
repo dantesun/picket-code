@@ -1,0 +1,50 @@
+name: Net probe (temporary)
+
+# Measures the download path from a GitHub runner rather than from a laptop, so
+# the numbers are not coloured by a local proxy. Delete once the mirror question
+# is settled.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "How many times to fetch each URL"
+        required: false
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ZIP: https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip
+      SUM: https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS
+      SUM_ALT: https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS
+      CF: "https://speed.cloudflare.com/__down?bytes=20000000"
+      GH: https://github.com/dantesun/picket-code/releases/download/v1.143.1-p4/picket-code-v1.143.1-p4-win32-x64.zip
+      RUNS: ${{ inputs.runs }}
+    steps:
+      - name: Probe
+        run: |
+          for i in $(seq 1 "$RUNS"); do
+            echo "--- round $i ---"
+            for name in CF GH ZIP SUM SUM_ALT; do
+              url=$(eval "echo \$$name")
+              printf '%-8s ' "$name"
+              curl -sL -o /dev/null --max-time 12 \
+                -w 'speed=%{speed_download}B/s got=%{size_download} ttfb=%{time_starttransfer}s\n' "$url" || true
+            done
+            echo "--- headers ---"
+            curl -sI --max-time 20 "$ZIP" | grep -iE 'cf-ray|cf-cache-status|x-picket-cache|age:' || true
+          done
+
+      - name: Single-range reads
+        run: |
+          for off in 0 100000000 200000000; do
+            end=$((off + 1048575))
+            printf 'range %-11s ' "$off"
+            curl -s -o /dev/null --max-time 12 -r "$off-$end" \
+              -w 'speed=%{speed_download}B/s got=%{size_download}\n' "$ZIP" || true
+          done
