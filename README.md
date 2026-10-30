@@ -19,16 +19,16 @@ MVP 范围（当前发行）：**Linux (x64)** 与 **Windows (x64)**——`tar.g
 
 ## 快速开始
 
-当前发行版 **v1.143.1-p3**（上游 VS Code `1.143.1`）。发行包文件名带版本号，推荐从镜像站下载（国内访问更快）：
+当前发行版 **v1.143.1-p4**（上游 VS Code `1.143.1`）。发行包文件名带版本号，推荐从镜像站下载（国内访问更快）：
 
 | 平台 | 下载地址 |
 |---|---|
-| Windows (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip` |
-| Linux (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz` |
-| 校验和 | `https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS` |
+| Windows (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip` |
+| Linux (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz` |
+| 校验和 | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS` |
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

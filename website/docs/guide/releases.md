@@ -39,18 +39,24 @@ versions ──► compile(linux) ──┐
 
 ## 触发方式
 
-- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p3`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p1` → `v1.143.1-p2` → `v1.143.1-p3`；工作流会剥掉 `-pN` 后定位上游 tag。
+- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p4`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p1` → `v1.143.1-p2` → `v1.143.1-p4`；工作流会剥掉 `-pN` 后定位上游 tag。
 - **手动触发**：`workflow_dispatch`，可指定上游版本与是否预发布。
 
-> 历史：`v1.143.1`（2026-10-27）ASAR 含 748 个重叠条目，会崩溃扩展宿主；`v1.143.1-p1` / `v1.143.1-p2` 因 `product.json` 两个字段被写成 `null` / `{}`，扩展扫描器构造即抛错，装上后不加载任何扩展（连 `--list-extensions` 都失败）。三个版本均已删除，当前唯一发行版是 `v1.143.1-p3`。
+> 历史：`v1.143.1`（2026-10-27）ASAR 含 748 个重叠条目，会崩溃扩展宿主；`v1.143.1-p1` / `v1.143.1-p2` 因 `product.json` 两个字段被写成 `null` / `{}`，扩展扫描器构造即抛错，装上后不加载任何扩展（连 `--list-extensions` 都失败）。三个版本均已删除。`v1.143.1-p3` 修好了扩展加载，当前发行版为 `v1.143.1-p4`。
 
-## 当前版本 v1.143.1-p3
+## 当前版本 v1.143.1-p4
+
+- **语音**：启动不再为云听写向 GitHub 认证要会话（此前每次启动等满 10 秒并打一条 WARN）；Voice Mode 整块不再加载（`agentsVoice.*` 命令、会话选择器、转录视图、onboarding、原生命令，约 7400 行），云听写入口随之消失；**本地离线听写保留**（`foundry-local-sdk`，无需登录、无需权益）。
+- **欢迎页**：启动时不再自动打开（`workbench.startupEditor` 默认 `none`）；agents banner 不再拿到账户服务，因此不可能再出现无法完成的 "Sign in to GitHub"；移除两张 "Get started with VS Code" 走查卡片，无障碍走查保留（帮助菜单按 id 打开它），标题改为 Picket Code。
+- **agent host**：不再为 Electron 主进程那条连接注册 BYOK 反向桥——那条连接从来没有这个通道，此前每次启动会打 `Unknown channel: agentHostClientByokLm`。
+- **验证**：`verify-release` 新增三条运行时断言（日志中不得出现 `[chat-stt]`、`Unknown channel: agentHostClientByokLm`、`walkThrough://vscode_getting_started_page`），linux 与 win32 均通过；`--list-extensions` 退出 0，`vscode.git` 等 5 个内置扩展完成激活。
+
+### 历史版本 v1.143.1-p3
 
 - `builtInExtensionsEnabledWithAutoUpdates` 恢复为上游类型（空数组），`tunnelApplicationConfig` 整个键移除 → 扩展扫描器不再崩，用户扩展与内置扩展都可加载；
 - `apply-patches.sh` 新增形状守卫（`build/check-product-shapes.py`）：覆盖项类型不符、删除上游数组/对象键未登记守卫、新增上游不存在的空容器，都会让构建失败；
 - 无默认账户提供方时释放 `initBarrier`，GitHub 相关视图不再永远转圈，账户策略门禁不再停在 Inactive；
-- 状态栏 Copilot 图标与看板、Welcome 的 "Use AI features with Copilot for free" 步骤、终端命令文案里的 `copilot` 均已消失（`ChatContextKeys.Setup.hidden` 未动，MCP 命令不受影响）；
-- linux 与 win32 runner 实测：`--list-extensions` 退出 0，`exthost.log` 中 `vscode.git` 等 5 个启动期内置扩展完成激活，应用日志无错误签名。
+- 状态栏 Copilot 图标与看板、Welcome 的 "Use AI features with Copilot for free" 步骤、终端命令文案里的 `copilot` 均已消失（`ChatContextKeys.Setup.hidden` 未动，MCP 命令不受影响）。
 
 ## 版本策略
 
@@ -72,14 +78,14 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 直出对象）。示例（tag `v1.143.1-p3`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 直出对象）。示例（tag `v1.143.1-p4`）：
 
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS -o SHA256SUMS
+curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

@@ -74,11 +74,11 @@ git push
 
 ### 1. 下载地址的形式
 
-对象键就是文件名，文件名带版本（示例 tag `v1.143.1-p3`）：
+对象键就是文件名，文件名带版本（示例 tag `v1.143.1-p4`）：
 
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-win32-x64.zip`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-linux-x64.tar.gz`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
+- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
 
 因为文件名含版本，一个 URL 对应的对象永不覆盖，Worker 因此返回 `cache-control: public, max-age=31536000, immutable`，可被 CDN 与客户端长期缓存。桶里**没有** `latest` 别名，旧的无版本对象（`picket-code-win32-x64.zip`、`SHA256SUMS`）已删除且不再生成，请求返回 404（不提供兼容）。
 

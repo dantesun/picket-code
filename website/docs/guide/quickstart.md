@@ -4,16 +4,16 @@
 
 Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版（fork），以干净、无遥测的二进制分发。它面向在可信、按项目隔离的环境中运行 AI 编码 agent 的团队，以 [iCode](https://github.com/openJiuwen-ai/iCode) 作为唯一 agent 方向——典型场景是银行 / 信创内网。
 
-> 当前发行版（v1.143.1-p3）**没有可用的 agent 后端**：AgentHost 已在不装 Copilot 包的情况下启动并说协议，但 iCode 适配层（P3–P4）尚未实现。
+> 当前发行版（v1.143.1-p4）**没有可用的 agent 后端**：AgentHost 已在不装 Copilot 包的情况下启动并说协议，但 iCode 适配层（P3–P4）尚未实现。
 
 ## 1. 下载
 
-从镜像站 `https://picket-code.noware.cn` 下载对应平台的压缩包（文件名带版本号，示例版本 `v1.143.1-p3`；同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上），或使用[一键下载安装命令](/guide/download)（自动解析最新版本并校验 SHA256）。
+从镜像站 `https://picket-code.noware.cn` 下载对应平台的压缩包（文件名带版本号，示例版本 `v1.143.1-p4`；同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上），或使用[一键下载安装命令](/guide/download)（自动解析最新版本并校验 SHA256）。
 
 | 平台 | 压缩包 | 启动方式 |
 |---|---|---|
-| Linux (x64) | `picket-code-v1.143.1-p3-linux-x64.tar.gz` | `./picket-code` |
-| Windows (x64) | `picket-code-v1.143.1-p3-win32-x64.zip` | `Picket Code.exe` |
+| Linux (x64) | `picket-code-v1.143.1-p4-linux-x64.tar.gz` | `./picket-code` |
+| Windows (x64) | `picket-code-v1.143.1-p4-win32-x64.zip` | `Picket Code.exe` |
 
 > 镜像保留最近 3 个版本，更早的版本不承诺长期可下载；旧的无版本 URL（`/picket-code-win32-x64.zip`、`/SHA256SUMS`）已废弃，不提供兼容。解压出的顶层目录不带版本号：`picket-code-win32-x64/`、`picket-code-linux-x64/`。
 
@@ -22,7 +22,7 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 **Linux**
 
 ```bash
-tar -xzf picket-code-v1.143.1-p3-linux-x64.tar.gz
+tar -xzf picket-code-v1.143.1-p4-linux-x64.tar.gz
 cd picket-code-linux-x64
 ```
 
