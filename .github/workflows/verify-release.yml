@@ -160,6 +160,15 @@ jobs:
             printf '%s\n' "$hits" | head -10
             fail=1
           fi
+          # this build ships without the services behind these lines: a fresh
+          # profile must not wait on them or open the welcome page on its own
+          leftovers=$(grep -hE '\[chat-stt\]|Unknown channel: agentHostClientByokLm|walkThrough://vscode_getting_started_page' \
+            "$profile"/data/logs/*/*.log "$profile"/data/logs/*/*/*.log 2>/dev/null || true)
+          if [ -n "$leftovers" ]; then
+            echo "FAIL: a removed surface still reports activity"
+            printf '%s\n' "$leftovers" | head -10
+            fail=1
+          fi
           if [ "$fail" -eq 0 ]; then
             echo "extensions load and the app log is clean"
           fi
@@ -271,6 +280,15 @@ jobs:
           if ($hits) {
             "FAIL: regression signature found in the app log"
             $hits | Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
+            $fail = $true
+          }
+          # this build ships without the services behind these lines: a fresh
+          # profile must not wait on them or open the welcome page on its own
+          $leftovers = Get-ChildItem $logs -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+            Select-String -Pattern '\[chat-stt\]|Unknown channel: agentHostClientByokLm|walkThrough://vscode_getting_started_page'
+          if ($leftovers) {
+            "FAIL: a removed surface still reports activity"
+            $leftovers | Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
             $fail = $true
           }
           if (-not $fail) { "extensions load and the app log is clean" }

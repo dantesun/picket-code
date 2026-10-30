@@ -1,0 +1,297 @@
+diff --git a/src/vs/platform/agentHost/common/agentHostClientByokLmChannel.ts b/src/vs/platform/agentHost/common/agentHostClientByokLmChannel.ts
+index 83e82cb4d1f..feb6c673c34 100644
+--- a/src/vs/platform/agentHost/common/agentHostClientByokLmChannel.ts
++++ b/src/vs/platform/agentHost/common/agentHostClientByokLmChannel.ts
+@@ -26,6 +26,13 @@ import {
+  */
+ export const AGENT_HOST_CLIENT_BYOK_LM_CHANNEL = 'agentHostClientByokLm';
+ 
++/**
++ * Connection id the Electron main process uses when it drives the agent host
++ * itself. That connection never provides BYOK language models, so the reverse
++ * bridge must not be registered for it.
++ */
++export const AGENT_HOST_MAIN_PROCESS_CLIENT_ID = 'agentHost';
++
+ /**
+  * Wraps an {@link IChannel} (obtained from the agent host's
+  * `UtilityProcessServer.getChannel`) into an {@link IByokLmBridgeConnection}
+diff --git a/src/vs/platform/agentHost/electron-main/electronAgentHostStarter.ts b/src/vs/platform/agentHost/electron-main/electronAgentHostStarter.ts
+index 3e2a5c1c95f..a39fc9d35a4 100644
+--- a/src/vs/platform/agentHost/electron-main/electronAgentHostStarter.ts
++++ b/src/vs/platform/agentHost/electron-main/electronAgentHostStarter.ts
+@@ -8,6 +8,7 @@ import { Emitter } from '../../../base/common/event.js';
+ import { IpcMainEvent, WebContents } from 'electron';
+ import { validatedIpcMain } from '../../../base/parts/ipc/electron-main/ipcMain.js';
+ import { Client as MessagePortClient } from '../../../base/parts/ipc/electron-main/ipc.mp.js';
++import { AGENT_HOST_MAIN_PROCESS_CLIENT_ID } from '../common/agentHostClientByokLmChannel.js';
+ import { ProxyChannel } from '../../../base/parts/ipc/common/ipc.js';
+ import { AiAgentEnvValue, AiAgentEnvVar } from '../../chat/common/aiAgentEnv.js';
+ import { IConfigurationService } from '../../configuration/common/configuration.js';
+@@ -194,7 +195,7 @@ export class ElectronAgentHostStarter extends Disposable implements IAgentHostSt
+ 			}
+ 
+ 			const port = utilityProcess.connect();
+-			const client = new MessagePortClient(port, 'agentHost');
++			const client = new MessagePortClient(port, AGENT_HOST_MAIN_PROCESS_CLIENT_ID);
+ 			const managementService = ProxyChannel.toService<IAgentHostManagementService>(client.getChannel(AgentHostIpcChannels.Management));
+ 
+ 			const store = new DisposableStore();
+diff --git a/src/vs/platform/agentHost/node/agentHostMain.ts b/src/vs/platform/agentHost/node/agentHostMain.ts
+index 92a2f77d6ab..24ef8433cf3 100644
+--- a/src/vs/platform/agentHost/node/agentHostMain.ts
++++ b/src/vs/platform/agentHost/node/agentHostMain.ts
+@@ -48,7 +48,7 @@ import { createAgentHostRuntime, type IAgentHostRuntime } from './agentHostBoots
+ import { BANG_COMMAND_PREFIX } from './agentHostBangCommand.js';
+ import { AgentHostClientFileSystemProvider } from '../common/agentHostClientFileSystemProvider.js';
+ import { AGENT_CLIENT_SCHEME } from '../common/agentClientUri.js';
+-import { AGENT_HOST_CLIENT_BYOK_LM_CHANNEL, createAgentHostClientByokLmConnection } from '../common/agentHostClientByokLmChannel.js';
++import { AGENT_HOST_CLIENT_BYOK_LM_CHANNEL, AGENT_HOST_MAIN_PROCESS_CLIENT_ID, createAgentHostClientByokLmConnection } from '../common/agentHostClientByokLmChannel.js';
+ import { AGENT_HOST_CLIENT_PROXY_CHANNEL, createAgentHostClientProxyConnection } from '../common/agentHostClientProxyChannel.js';
+ import { join } from '../../../base/common/path.js';
+ import ErrorTelemetry from '../../telemetry/node/errorTelemetry.js';
+@@ -228,7 +228,9 @@ async function startAgentHost(): Promise<void> {
+ 				const getChannel = (channelName: string) => server.getChannel(channelName, c => c.ctx === clientId);
+ 				const proxyConnection = createAgentHostClientProxyConnection(getChannel(AGENT_HOST_CLIENT_PROXY_CHANNEL));
+ 				connectionStore.add(proxyResolver.register(clientId, proxyConnection));
+-				if (byokLmBridgeRegistry) {
++				// the main process only drives the host; it never serves BYOK models, so a
++				// bridge to it would probe a channel that does not exist on that connection
++				if (byokLmBridgeRegistry && clientId !== AGENT_HOST_MAIN_PROCESS_CLIENT_ID) {
+ 					const byokLmConnection = createAgentHostClientByokLmConnection(getChannel(AGENT_HOST_CLIENT_BYOK_LM_CHANNEL));
+ 					connectionStore.add(byokLmBridgeRegistry.register(clientId, byokLmConnection));
+ 				}
+diff --git a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+index c2f1e009258..d84b6c1f7ac 100644
+--- a/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
++++ b/src/vs/workbench/contrib/chat/browser/chat.shared.contribution.ts
+@@ -164,7 +164,6 @@ import './voiceClient/voiceClientService.js';
+ import './voiceClient/voiceSessionController.js';
+ import './voiceClient/voiceToolDispatchService.js';
+ import './voiceInputMode/voiceInputMode.js';
+-import { ChatVoiceInputModeAction, ChatVoiceInputModeToggleListenAction, registerVoiceInputModeSimulateActions } from './voiceInputMode/voiceInputModeActionViewItem.js';
+ 
+ import { ChatContextKeys } from '../common/actions/chatContextKeys.js';
+ import { AICustomizationManagementCommands } from '../common/aiCustomizationWorkspaceService.js';
+@@ -3383,9 +3382,6 @@ registerChatPromptNavigationActions();
+ registerChatTitleActions();
+ registerChatExecuteActions();
+ registerChatFindActions();
+-registerAction2(ChatVoiceInputModeAction);
+-registerAction2(ChatVoiceInputModeToggleListenAction);
+-registerVoiceInputModeSimulateActions();
+ registerChatSpeechToTextActions();
+ registerConfigureSpeechInstructionsActions();
+ registerChatQueueActions();
+diff --git a/src/vs/workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.ts b/src/vs/workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.ts
+index 280337a612a..60026c10c8f 100644
+--- a/src/vs/workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.ts
++++ b/src/vs/workbench/contrib/chat/browser/speechToText/chatSpeechToTextService.ts
+@@ -675,6 +675,11 @@ export class ChatSpeechToTextService extends Disposable implements IChatSpeechTo
+ 	}
+ 
+ 	private async _refreshGitHubSession(): Promise<void> {
++		// this build ships without the GitHub authentication provider, so asking for its
++		// sessions would sit in the 10s provider-registration wait on every start
++		if (!this._authenticationService.isAuthenticationProviderRegistered('github')) {
++			return;
++		}
+ 		const generation = ++this._githubSessionGeneration;
+ 		try {
+ 			const sessions = await this._authenticationService.getSessions('github', [], { silent: true });
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+index 067580a4b11..dfa4bb83bc2 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.contribution.ts
+@@ -327,7 +327,7 @@ configurationRegistry.registerConfiguration({
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.terminal' }, "Open a new terminal in the editor area."),
+ 				localize({ comment: ['This is the description for a setting. Values surrounded by single quotes are not to be translated.'], key: 'workbench.startupEditor.agentSessionsWelcomePage' }, "Open the Agent Sessions Welcome page. Will override the workbench secondary side bar visibility settings."),
+ 			],
+-			'default': 'welcomePage',
++			'default': 'none',
+ 			'description': localize('workbench.startupEditor', "Controls which editor is shown at startup, if none are restored from the previous session."),
+ 			'experiment': { mode: 'auto' },
+ 			agentsWindow: { default: 'none', readOnly: true },
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+index 322ec1ab4f6..c06eb73e8cb 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -947,7 +947,9 @@ export class GettingStartedPage extends EditorPane {
+ 			this.telemetryService,
+ 			this.configurationService,
+ 			this.chatEntitlementService,
+-			this.defaultAccountService,
++			// no default account provider in this build: without it the banner would
++			// offer a sign-in action that can never complete
++			undefined,
+ 		);
+ 		this.categoriesSlideDisposables.add(agentsBanner.disposables);
+ 		footerChildren.push(agentsBanner.element);
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+index c4a640799eb..8087c322a95 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+@@ -252,137 +252,14 @@ function createCopilotSetupStep(id: string, button: string, includeTerms: boolea
+ }
+ 
+ export const walkthroughs: GettingStartedWalkthroughContent = [
+-	{
+-		id: 'Setup',
+-		title: localize('gettingStarted.setup.title', "Get started with VS Code"),
+-		description: localize('gettingStarted.setup.description', "Customize your editor, learn the basics, and start coding"),
+-		isFeatured: true,
+-		icon: setupIcon,
+-		when: '!isWeb',
+-		walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup VS Code'),
+-		next: 'Beginner',
+-		content: {
+-			type: 'steps',
+-			steps: [
+-				createCopilotSetupStep('CopilotSetupAnonymous', CopilotAnonymousButton, true),
+-				createCopilotSetupStep('CopilotSetupSignedOut', CopilotSignedOutButton, false),
+-				createCopilotSetupStep('CopilotSetupComplete', CopilotCompleteButton, false),
+-				createCopilotSetupStep('CopilotSetupSignedIn', CopilotSignedInButton, false),
+-				{
+-					id: 'pickColorTheme',
+-					title: localize('gettingStarted.pickColor.title', "Choose your theme"),
+-					description: localize('gettingStarted.pickColor.description.interpolated', "The right theme helps you focus on your code, is easy on your eyes, and is simply more fun to use.\n{0}", Button(localize('titleID', "Browse Color Themes"), 'command:workbench.action.selectTheme')),
+-					completionEvents: [
+-						'onSettingChanged:workbench.colorTheme',
+-						'onCommand:workbench.action.selectTheme'
+-					],
+-					media: { type: 'markdown', path: 'theme_picker', }
+-				},
+-				{
+-					id: 'videoTutorial',
+-					title: localize('gettingStarted.videoTutorial.title', "Watch video tutorials"),
+-					description: localize('gettingStarted.videoTutorial.description.interpolated', "Watch the first in a series of short & practical video tutorials for VS Code's key features.\n{0}", Button(localize('watch', "Watch Tutorial"), 'https://aka.ms/vscode-getting-started-video')),
+-					media: { type: 'svg', altText: 'VS Code Settings', path: 'learn.svg' },
+-				}
+-			]
+-		}
+-	},
+-
+-	{
+-		id: 'SetupWeb',
+-		title: localize('gettingStarted.setupWeb.title', "Get Started with VS Code for the Web"),
+-		description: localize('gettingStarted.setupWeb.description', "Customize your editor, learn the basics, and start coding"),
+-		isFeatured: true,
+-		icon: setupIcon,
+-		when: 'isWeb',
+-		next: 'Beginner',
+-		walkthroughPageTitle: localize('gettingStarted.setupWeb.walkthroughPageTitle', 'Setup VS Code Web'),
+-		content: {
+-			type: 'steps',
+-			steps: [
+-				{
+-					id: 'pickColorThemeWeb',
+-					title: localize('gettingStarted.pickColor.title', "Choose your theme"),
+-					description: localize('gettingStarted.pickColor.description.interpolated', "The right theme helps you focus on your code, is easy on your eyes, and is simply more fun to use.\n{0}", Button(localize('titleID', "Browse Color Themes"), 'command:workbench.action.selectTheme')),
+-					completionEvents: [
+-						'onSettingChanged:workbench.colorTheme',
+-						'onCommand:workbench.action.selectTheme'
+-					],
+-					media: { type: 'markdown', path: 'theme_picker', }
+-				},
+-				{
+-					id: 'menuBarWeb',
+-					title: localize('gettingStarted.menuBar.title', "Just the right amount of UI"),
+-					description: localize('gettingStarted.menuBar.description.interpolated', "The full menu bar is available in the dropdown menu to make room for your code. Toggle its appearance for faster access. \n{0}", Button(localize('toggleMenuBar', "Toggle Menu Bar"), 'command:workbench.action.toggleMenuBar')),
+-					when: 'isWeb',
+-					media: {
+-						type: 'svg', altText: 'Comparing menu dropdown with the visible menu bar.', path: 'menuBar.svg'
+-					},
+-				},
+-				{
+-					id: 'extensionsWebWeb',
+-					title: localize('gettingStarted.extensions.title', "Code with extensions"),
+-					description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are VS Code's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
+-					when: 'workspacePlatform == \'webworker\'',
+-					media: {
+-						type: 'svg', altText: 'VS Code extension marketplace with featured language extensions', path: 'extensions-web.svg'
+-					},
+-				},
+-				{
+-					id: 'findLanguageExtensionsWeb',
+-					title: localize('gettingStarted.findLanguageExts.title', "Rich support for all your languages"),
+-					description: localize('gettingStarted.findLanguageExts.description.interpolated', "Code smarter with syntax highlighting, inline suggestions, linting and debugging. While many languages are built-in, many more can be added as extensions.\n{0}", Button(localize('browseLangExts', "Browse Language Extensions"), 'command:workbench.extensions.action.showLanguageExtensions')),
+-					when: 'workspacePlatform != \'webworker\'',
+-					media: {
+-						type: 'svg', altText: 'Language extensions', path: 'languages.svg'
+-					},
+-				},
+-				{
+-					id: 'settingsSyncWeb',
+-					title: localize('gettingStarted.settingsSync.title', "Sync settings across devices"),
+-					description: localize('gettingStarted.settingsSync.description.interpolated', "Keep your essential customizations backed up and updated across all your devices.\n{0}", Button(localize('enableSync', "Backup and Sync Settings"), 'command:workbench.userDataSync.actions.turnOn')),
+-					when: 'syncStatus != uninitialized',
+-					completionEvents: ['onEvent:sync-enabled'],
+-					media: {
+-						type: 'svg', altText: 'The "Turn on Sync" entry in the settings gear menu.', path: 'settingsSync.svg'
+-					},
+-				},
+-				{
+-					id: 'commandPaletteTaskWeb',
+-					title: localize('gettingStarted.commandPalette.title', "Unlock productivity with the Command Palette "),
+-					description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in VS Code.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
+-					media: { type: 'svg', altText: 'Command Palette overlay for searching and executing commands.', path: 'commandPalette.svg' },
+-				},
+-				{
+-					id: 'pickAFolderTask-WebWeb',
+-					title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
+-					description: localize('gettingStarted.setup.OpenFolderWeb.description.interpolated', "You're all set to start coding. You can open a local project or a remote repository to get your files into VS Code.\n{0}\n{1}", Button(localize('openFolder', "Open Folder"), 'command:workbench.action.addRootFolder'), Button(localize('openRepository', "Open Repository"), 'command:remoteHub.openRepository')),
+-					when: 'workspaceFolderCount == 0',
+-					media: {
+-						type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
+-					}
+-				},
+-				{
+-					id: 'quickOpenWeb',
+-					title: localize('gettingStarted.quickOpen.title', "Quickly navigate between your files"),
+-					description: localize('gettingStarted.quickOpen.description.interpolated', "Navigate between files in an instant with one keystroke. Tip: Open multiple files by pressing the right arrow key.\n{0}", Button(localize('quickOpen', "Quick Open a File"), 'command:toSide:workbench.action.quickOpen')),
+-					when: 'workspaceFolderCount != 0',
+-					media: {
+-						type: 'svg', altText: 'Go to file in quick search.', path: 'search.svg'
+-					}
+-				}
+-			]
+-		}
+-	},
+ 	{
+ 		id: 'SetupAccessibility',
+ 		title: localize('gettingStarted.setupAccessibility.title', "Get Started with Accessibility Features"),
+-		description: localize('gettingStarted.setupAccessibility.description', "Learn the tools and shortcuts that make VS Code accessible. Note that some actions are not actionable from within the context of the walkthrough."),
++		description: localize('gettingStarted.setupAccessibility.description', "Learn the tools and shortcuts that make Picket Code accessible. Note that some actions are not actionable from within the context of the walkthrough."),
+ 		isFeatured: true,
+ 		icon: setupIcon,
+ 		when: CONTEXT_ACCESSIBILITY_MODE_ENABLED.key,
+-		next: 'Setup',
+-		walkthroughPageTitle: localize('gettingStarted.setupAccessibility.walkthroughPageTitle', 'Setup VS Code Accessibility'),
++		walkthroughPageTitle: localize('gettingStarted.setupAccessibility.walkthroughPageTitle', 'Setup Picket Code Accessibility'),
+ 		content: {
+ 			type: 'steps',
+ 			steps: [
+diff --git a/src/vs/workbench/workbench.common.main.ts b/src/vs/workbench/workbench.common.main.ts
+index b2aaf10f946..95de74564ae 100644
+--- a/src/vs/workbench/workbench.common.main.ts
++++ b/src/vs/workbench/workbench.common.main.ts
+@@ -233,7 +233,6 @@ import './contrib/chat/browser/chat.view.contribution.js';
+ import './contrib/inlineChat/browser/inlineChat.contribution.js';
+ 
+ // Copilot Voice
+-import './contrib/agentsVoice/browser/agentsVoice.contribution.js';
+ import './contrib/mcp/browser/mcp.contribution.js';
+ import './contrib/mcp/browser/mcp.view.contribution.js';
+ import './contrib/chat/browser/chatSessions/chatSessions.contribution.js';
+diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
+index 5278709d636..0fe7bc2dc61 100644
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -198,7 +198,6 @@ import './contrib/chat/electron-browser/chat.contribution.js';
+ import './contrib/chat/electron-browser/tunnelHost.contribution.js';
+ 
+ // Copilot Voice
+-import './contrib/agentsVoice/electron-browser/agentsVoiceNativeCommands.js';
+ 
+ // Encryption
+ import './contrib/encryption/electron-browser/encryption.contribution.js';

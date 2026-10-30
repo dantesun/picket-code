@@ -33,9 +33,20 @@
 #     keeps the plain "install commands in PATH" entry instead of a `copilot`
 #     shim we do not ship; the settings page no longer lists the chat extension as
 #     a recommended entry. 13 files.
+#   - 59 : the chat surfaces stop waiting for services this build does not ship.
+#     Dictation no longer asks for GitHub sessions when the provider cannot be
+#     registered (that was a 10s wait on every start); the Voice Mode contribution
+#     and its input-mode actions are no longer loaded, so `agentsVoice.*` commands
+#     and the cloud-dictation entry point disappear while on-device dictation
+#     stays; the welcome page no longer opens on startup, its agents banner never
+#     offers a sign-in that cannot complete, and the two "Get started with VS Code"
+#     cards are gone; the agent host stops registering a reverse BYOK bridge for
+#     the Electron main-process connection, which logged
+#     `Unknown channel: agentHostClientByokLm` on every start. 10 files.
 53-ext-copilot-remove-it.patch
 54-picket-code-disable-node-compile-cache.patch
 56-asar-serialize-inserts.patch
 57-agenthost-remove-copilot-deps.patch
 58-agenthost-clean-product-config.patch
+59-voice-welcome-byok.patch
 61-build-source-adaptations.patch
