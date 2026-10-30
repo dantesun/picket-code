@@ -1,6 +1,6 @@
 # 下载与安装
 
-> 当前版本：**v1.143.1-p4**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
+> 当前版本：**v1.143.1-p4**（上游 VS Code `1.143.1`）。发行包发布在 GitHub Releases，并镜像到 `https://download.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
 
 ## 版本标签与产物
 
@@ -26,11 +26,11 @@
 
 ## 方式一：直接下载
 
-镜像基地址：`https://picket-code.noware.cn`（示例版本 `v1.143.1-p4`）：
+镜像基地址：`https://download.noware.cn`（示例版本 `v1.143.1-p4`）：
 
-- Windows (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
-- Linux (x64)：`https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
-- 校验和：`https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
+- Windows (x64)：`https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
+- Linux (x64)：`https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
+- 校验和：`https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
 
 同一版本的同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上。
 
@@ -41,7 +41,7 @@
 ## 校验
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
@@ -90,7 +90,7 @@ curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/dow
 SHA256 不写死在脚本里（每次发版都会变）：脚本会解析该版本的 `picket-code-<tag>-SHA256SUMS` 并逐包比对。手工核对：
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
@@ -107,7 +107,7 @@ Get-FileHash .\picket-code-v1.143.1-p4-win32-x64.zip -Algorithm SHA256
 ## 常见问题
 
 **Q：下载 GitHub 附件慢怎么办？**
-优先用镜像地址 `https://picket-code.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本不承诺长期可下载。
+优先用镜像地址 `https://download.noware.cn/picket-code-<tag>-<os>-<arch>.<ext>`；镜像保留最近 3 个版本，更早的版本不承诺长期可下载。
 
 **Q：如何换版本？**
 把地址里的版本号换掉，或给脚本传 `-Tag` / 第一个参数（如 `v1.143.1-p4`）；校验值自动从该版本的 `picket-code-<tag>-SHA256SUMS` 读取，无需手工修改。镜像保留最近 3 个版本，更早的版本不承诺长期可下载。

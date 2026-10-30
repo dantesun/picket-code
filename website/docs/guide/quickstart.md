@@ -8,7 +8,7 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 
 ## 1. 下载
 
-从镜像站 `https://picket-code.noware.cn` 下载对应平台的压缩包（文件名带版本号，示例版本 `v1.143.1-p4`；同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上），或使用[一键下载安装命令](/guide/download)（自动解析最新版本并校验 SHA256）。
+从镜像站 `https://download.noware.cn` 下载对应平台的压缩包（文件名带版本号，示例版本 `v1.143.1-p4`；同名资产也在 [GitHub Releases](https://github.com/dantesun/picket-code/releases) 上），或使用[一键下载安装命令](/guide/download)（自动解析最新版本并校验 SHA256）。
 
 | 平台 | 压缩包 | 启动方式 |
 |---|---|---|

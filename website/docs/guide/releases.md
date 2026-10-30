@@ -78,14 +78,14 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 `https://picket-code.noware.cn` 提供（该域名同时承载文档站，`/picket-code-*` 路径由下载 Worker 提供）。对象在某个位置首次下载后进入 Cloudflare 边缘缓存，响应头 `x-picket-cache: HIT` 表示本次由边缘直接返回、没有再回源 R2。示例（tag `v1.143.1-p4`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 R2 自定义域名 `https://download.noware.cn` 提供（文档站仍在 `https://picket-code.noware.cn`）。该主机名是 R2 桶的自定义域名，对象由 R2 直接返回（`cf-cache-status: DYNAMIC`，即不经 Cloudflare 边缘缓存），因此每次下载都会读取 R2，但省掉了 Worker 这一跳。示例（tag `v1.143.1-p4`）：
 
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
-- `https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
+- `https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
+- `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
+- `https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

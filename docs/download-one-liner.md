@@ -4,7 +4,7 @@
 
 > 当前版本：**v1.143.1-p4**（上游 VS Code `1.143.1`）。
 > 脚本不带版本参数时自动解析 GitHub 上最新的 release；显式传入标签（如 `v1.143.1-p4`）同样支持。
-> 发行包发布在 GitHub Releases，并镜像到 `https://picket-code.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
+> 发行包发布在 GitHub Releases，并镜像到 `https://download.noware.cn`（保留最近 3 个版本，更早的版本不承诺长期可下载）。
 > 脚本自带：显式进度（curl 进度条 / 百分比）、失败自动重试 5 次、断点续传（服务器支持 Range 时）。
 
 ---
@@ -45,13 +45,13 @@ curl -fSL "https://raw.githubusercontent.com/dantesun/picket-code/main/build/dow
 文件名带版本号（示例 tag `v1.143.1-p4`）：
 
 ```text
-https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip
-https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz
-https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS
+https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip
+https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz
+https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS
 ```
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

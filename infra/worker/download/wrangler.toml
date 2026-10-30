@@ -2,9 +2,10 @@ name = "picket-downloads"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
-# The website is served by Cloudflare Pages on the same hostname. A worker route
-# wins over Pages for the paths it matches, so only the release objects are
-# handled here and everything else stays with Pages.
+# Legacy host: release objects are now served by the R2 custom domain
+# (download.noware.cn) directly. This route stays so old picket-code.noware.cn
+# links keep working; on the same hostname a worker route still wins over Pages,
+# so everything outside /picket-code-* stays with Pages.
 [[routes]]
 pattern = "picket-code.noware.cn/picket-code-*"
 zone_name = "noware.cn"

@@ -23,12 +23,12 @@ MVP 范围（当前发行）：**Linux (x64)** 与 **Windows (x64)**——`tar.g
 
 | 平台 | 下载地址 |
 |---|---|
-| Windows (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip` |
-| Linux (x64) | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz` |
-| 校验和 | `https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS` |
+| Windows (x64) | `https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip` |
+| Linux (x64) | `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz` |
+| 校验和 | `https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS` |
 
 ```bash
-curl -fSL https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

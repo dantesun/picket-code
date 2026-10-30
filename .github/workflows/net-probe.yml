@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      ZIP: https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip
-      SUM: https://picket-code.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS
-      SUM_ALT: https://picket-code.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS
+      ZIP: https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip
+      SUM: https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS
+      SUM_ALT: https://download.noware.cn/picket-code-v1.143.1-p3-SHA256SUMS
       CF: "https://speed.cloudflare.com/__down?bytes=20000000"
       GH: https://github.com/dantesun/picket-code/releases/download/v1.143.1-p4/picket-code-v1.143.1-p4-win32-x64.zip
       RUNS: ${{ inputs.runs }}

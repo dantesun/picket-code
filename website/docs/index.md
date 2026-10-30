@@ -149,7 +149,7 @@ hero:
   <div class="pc-step">
     <span class="pc-step-no">1</span>
     <h3>下载发行包</h3>
-    <p>从镜像站 <a href="https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip"><code>picket-code.noware.cn</code></a>（或 <a href="https://github.com/dantesun/picket-code/releases">GitHub Releases</a>）获取对应平台的 <code>tar.gz</code> / <code>zip</code>，脚本自动完成 SHA256 校验。<a href="/guide/download">下载页</a> 有完整地址与校验命令。</p>
+    <p>从镜像站 <a href="https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip"><code>download.noware.cn</code></a>（或 <a href="https://github.com/dantesun/picket-code/releases">GitHub Releases</a>）获取对应平台的 <code>tar.gz</code> / <code>zip</code>，脚本自动完成 SHA256 校验。<a href="/guide/download">下载页</a> 有完整地址与校验命令。</p>
   </div>
   <div class="pc-step">
     <span class="pc-step-no">2</span>
@@ -168,7 +168,7 @@ hero:
 <div class="pc-section">
 
 <h2 class="pc-title">平台支持与 <span>下载</span></h2>
-<p class="pc-sub">当前发行：Linux (x64) 与 Windows (x64)，tar.gz 与 zip 压缩包；macOS 与 ARM64 在 P0 验证闭环后加入。下载走 <code>https://picket-code.noware.cn</code>（保留最近 3 个版本，更早的版本不承诺长期可下载）。</p>
+<p class="pc-sub">当前发行：Linux (x64) 与 Windows (x64)，tar.gz 与 zip 压缩包；macOS 与 ARM64 在 P0 验证闭环后加入。下载走 <code>https://download.noware.cn</code>（保留最近 3 个版本，更早的版本不承诺长期可下载）。</p>
 
 <div class="pc-dl-grid">
   <div class="pc-dl-card">
@@ -179,7 +179,7 @@ hero:
     <ul>
       <li>压缩包：<code>picket-code-v1.143.1-p4-linux-x64.tar.gz</code>（文件名带版本）</li>
       <li>启动：<code>./picket-code</code></li>
-      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
+      <li><a href="https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
   </div>
   <div class="pc-dl-card">
@@ -190,7 +190,7 @@ hero:
     <ul>
       <li>压缩包：<code>picket-code-v1.143.1-p4-win32-x64.zip</code>（文件名带版本）</li>
       <li>启动：<code>Picket Code.exe</code></li>
-      <li><a href="https://picket-code.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
+      <li><a href="https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip">镜像直链</a> · <a href="/guide/download">一键下载安装命令 →</a></li>
     </ul>
   </div>
 </div>
