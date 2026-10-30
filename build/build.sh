@@ -74,25 +74,15 @@ for i in 1 2 3 4 5; do
   sleep $(( 15 * (i + 1) ))
 done
 
-echo "==> [picket-code] Stamping product version"
-# The packaged app reports `package.json`'s version (gulpfile.vscode.ts copies it into the
-# built product.json). Build metadata (`+pN`) keeps the value semver-compatible with
-# extension engine ranges, which a prerelease (`-pN`) would break.
-case "$PICKET_VERSION" in
-  *-*) PICKET_REV="${PICKET_VERSION##*-}" ;;
-  *)   PICKET_REV="local" ;;
-esac
-python3 - "$VSCODE_VERSION" "$PICKET_REV" <<'PYEOF'
-import json, sys
-version = f'{sys.argv[1]}+{sys.argv[2]}'
-with open('package.json', encoding='utf-8') as f:
-    package = json.load(f)
-package['version'] = version
-with open('package.json', 'w', encoding='utf-8') as f:
-    json.dump(package, f, indent=2, ensure_ascii=False)
-    f.write('\n')
-print(f'  package.json version = {version}')
-PYEOF
+# No version stamping: the packaged app reports upstream `package.json`'s version verbatim
+# (gulpfile.vscode.ts copies it into the built product.json). Any suffix breaks extension
+# compatibility, because the product version is parsed with
+#   /^(\^|>=)?((\d+)|x)\.((\d+)|x)\.((\d+)|x)(\-.*)?$/     (extensionValidator.ts)
+# which has no build-metadata branch: `1.143.1+p4` makes parseVersion() return null, so
+# isValidVersion() is false and *every* extension with a `main` is refused with
+# "not compatible with Code 1.143.1+p4". A prerelease (`1.143.1-p4`) parses, but then
+# semver.satisfies() on the gallery side no longer matches `^1.x` engine ranges. The picket
+# revision lives in the git tag and the artifact name only.
 
 echo "==> [picket-code] Building vscode-$PLATFORM-$ARCH-min"
 export NODE_OPTIONS="--max-old-space-size=8192"

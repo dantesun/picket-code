@@ -43,9 +43,9 @@ function w(distro, cmd, useDefaultShell) {
 
 ## 三、服务端从哪来
 
-服务端不是随扩展分发的，而是**按 commit 从更新服务器取整包**。两条路径并存：
+服务端不是随扩展分发的，而是**按 commit 从更新服务器取整包**。下面是脚本视角的两条路径，但要注意 **1.104.7 里脚本已不是主路径**：`dist/node/extension.js` 对 `wslServer.sh` / `wslCode.sh` / `wslDownload.sh` 的引用为 0，主流程改成了「在发行版里放 `bin-cli/<commit>/code-cli`，再用 `spawnCli` + exec-server 协议驱动它」，脚本只在 `dist/node/wslDaemon.js` 里还有残留引用。手工预置的做法见 `docs/manual-remote-wsl.md`。
 
-### 3.1 传统路径（脚本）
+### 3.1 传统路径（脚本，1.104.7 已非主路径）
 
 `scripts/wslCode.sh`（`code .` 入口）、`scripts/wslServer.sh`（起 server）、`scripts/wslDownload.sh`（下载安装）。
 
@@ -122,17 +122,24 @@ function EP(..., { updateUrl, quality, commit }, ...) {
 }
 ```
 
-三个输入全部取自**客户端自己的 `product.json`**。我们当前的值是：
+三个输入全部取自**客户端自己的 `product.json`**。装好的 1.143.1 里实际是：
 
 ```
-commit    = null
+commit    = e646868227c3e3a9e3f24277c8c7220be42c0be7   （上游真实 commit）
 updateUrl = null
 quality   = "stable"
 ```
 
-因此：**这个扩展在我们的发行版上不会尝试任何下载**，解析会直接失败；即便把字段填上并指向微软更新服务器，也只会 404——`commit:` 后必须是真实存在的构建，而我们的 commit 微软侧没有。
+因此：**这个扩展在我们的发行版上不会尝试任何下载**，`EP()` 直接返回空实现的下载器，解析阶段就失败。
 
-（这也是"侧载官方 VSIX 在 Codium 类产品上跑不起来"的真实原因：瓶颈在服务端获取，不在签名或许可证。）
+早先这里有两处判断需要更正：
+
+- `commit` 并不是 null，它就是上游 1.143.1 的 commit。微软 CDN 上这个 commit 的 `server-linux-x64`（222 MB）与 `cli-linux-x64`（13 MB）**都存在**，实测可下载，所以「填了也只会 404」不成立。
+- 因此第六节 ②「自建 reh server」不是必需项，可以改为把 `updateUrl` 指向微软更新服务器、再按 `docs/manual-remote-wsl.md` 预置产物。代价是 `updateUrl` 同时是自更新入口，指过去必须配 `"update.mode": "none"`，否则应用会去拉一份正版 VS Code 覆盖自己。
+
+另记一条与本节无关、但同样卡住侧载的事实：发行版早先把产品版本打成 `1.143.1+p4`，而上游 `extensionValidator.ts` 的版本正则不接受 `+build`（`/^(\^|>=)?((\d+)|x)\.((\d+)|x)\.((\d+)|x)(\-.*)?$/`），导致**任何**带 `main` 的扩展（含侧载 `.vsix`）都被判为不兼容。该版本戳已从 `build/build.sh` 移除。
+
+（"侧载官方 VSIX 在 Codium 类产品上跑不起来"要分两层：**装不上**一般另有原因，例如本发行版早先的 `+p4` 版本戳（见上）；**装了起不来**才是这里说的服务端获取，不是签名或许可证。）
 
 ## 六、要接进我们的发行版，缺三块（都是开源部分）
 
@@ -162,3 +169,7 @@ npx -y rea-agents@6.8.0 analyze-javascript-application /tmp/rea-wsl/ext/extensio
 ```
 
 重点文件：`ext/extension/package.json`（贡献点与设置）、`dist/node/extension.js`（解析器、URL 构造、ExecServer）、`dist/node/wslDaemon.js`（管道 daemon）、`scripts/wsl{Code,Server,Download}.sh`（传统路径全流程）。
+
+## 九、手工安装与预置
+
+`.vsix` 离线安装、以及把 CLI + Server 预置进发行版以绕开下载的完整流程，见 `docs/manual-remote-wsl.md`（脚本：`build/manual-wsl-server.sh`）。
