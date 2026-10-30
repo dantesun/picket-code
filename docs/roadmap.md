@@ -23,6 +23,7 @@
 
 - 打包升级：AppImage / deb、dmg、NSIS 安装器、代码签名。
 - macOS（darwin）在 P0 验证后加入发行矩阵。
+- 远程开发（WSL / SSH）：前置是自有 reh server 产物 + `product.json` 的 `commit`/`updateUrl`。微软的 Remote 扩展闭源且按 commit 从微软更新服务器取服务端，无法直接复用；实现分析与缺口见 `docs/remote-wsl-extension-analysis.md`。
 - CI 矩阵加入 ARM64。
 - 可复现构建：G6 分级验收（L1 关键产物哈希一致 → L2 内容级一致 → L3 字节级一致，见 `docs/design.md` 5.5）。
 - 核验微软 Private Marketplace 对非官方 fork 的开放度。
