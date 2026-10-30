@@ -46,8 +46,21 @@ jobs:
       - name: Show source
         run: rclone lsl "r2:${SOURCE}/"
 
+      # The R2 credentials are scoped to one bucket; server-side copy is refused
+      # even when both buckets are visible. Probe a plain upload first, and fall
+      # back to download+upload when the copy call is not permitted.
+      - name: Probe write access to target
+        run: |
+          echo probe > /tmp/__perm_probe.txt
+          rclone copyto /tmp/__perm_probe.txt "r2:${TARGET}/__perm_probe.txt" || {
+            echo "::error::the R2 credentials cannot write to ${TARGET}; update the token scope"
+            exit 1
+          }
+          rclone deletefile "r2:${TARGET}/__perm_probe.txt"
+          echo "write access ok"
+
       - name: Copy source to target
-        run: rclone copy --s3-no-check-bucket --transfers 8 --checkers 16 --progress "r2:${SOURCE}/" "r2:${TARGET}/"
+        run: rclone copy --disable copy --s3-no-check-bucket --transfers 8 --checkers 16 --progress "r2:${SOURCE}/" "r2:${TARGET}/"
 
       - name: Show target
         run: rclone lsl "r2:${TARGET}/"
