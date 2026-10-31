@@ -21,6 +21,14 @@
     "serviceUrl": "https://open-vsx.org/vscode/gallery",
     "itemUrl": "https://open-vsx.org/vscode/item"
   },
+  "extensionEnabledApiProposals": {
+    "ms-vscode-remote.remote-wsl": [
+      "resolvers",
+      "contribRemoteHelp",
+      "contribViewsRemote",
+      "telemetry"
+    ]
+  },
   "quality": "stable",
   "builtInExtensions": [
     {
