@@ -9,6 +9,12 @@
 #
 # 本脚本要在**目标发行版内部**执行（不是 Windows 侧）。
 #
+# 许可警示：脚本取用的是微软受许可约束的产物（Remote-WSL 的 CLI 与 server），仅限个人在
+# 自己的开发机上自用。扩展许可 §1.a 要求"与合法授权的 Microsoft Visual Studio Code 副本
+# 一起使用"，§6 禁止 work around technical limitations，§7 禁止 host/share/publish。
+# 因此不要把产物放进仓库、Release 或任何公共下载点，也不要把本脚本接进 CI / release
+# workflow。场景对照与合规路线见 docs/manual-remote-wsl.md 第九节。
+#
 # 用法:
 #   bash manual-wsl-server.sh --commit <40位 sha> [选项]
 #   bash manual-wsl-server.sh --product-json <product.json 路径> [选项]
@@ -80,6 +86,9 @@ printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' \
   || die "commit 必须是 40 位小写十六进制: $COMMIT"
 
 FOLDER="${FOLDER:-.picket-code-server}"
+# 必须与 build/product.json 的 serverApplicationName 一致：wslServer.sh 用
+# "$VSCODE_REMOTE_BIN/$COMMIT/bin/$SERVER_APPNAME" 启动服务。
+SERVER_APPNAME="${SERVER_APPNAME:-picket-code-server}"
 QUALITY="${QUALITY:-stable}"
 case "$QUALITY" in
   stable|insider) ;;
@@ -242,6 +251,59 @@ else
   # 归档里自带一层顶层目录，和扩展的 tar -xz --strip-components 1 保持一致。
   tar -xzf "$SERVER_FILE" -C "$DEST_SERVER" --strip-components 1
   [ -d "$DEST_SERVER/bin" ] || die "解包后没有 bin/，归档布局与预期不符: $SERVER_FILE"
+fi
+
+# 入口文件名必须等于 product.json 的 serverApplicationName（wslServer.sh 按此拼路径），
+# 归档里只有 code-server。
+ENTRY="$DEST_SERVER/bin/$SERVER_APPNAME"
+if [ -x "$DEST_SERVER/bin/code-server" ]; then
+  # 早先版本在这里生成过包装脚本，先清掉再改成软链接。
+  if grep -qs 'picket-code-wrapper' "$ENTRY"; then
+    rm -f "$ENTRY"
+  fi
+  if [ ! -e "$ENTRY" ]; then
+    ln -s code-server "$ENTRY"
+    info "生成入口: bin/$SERVER_APPNAME -> code-server"
+  fi
+fi
+
+# 数据与扩展目录由 server 自己按 product.json 决定：serverDataFolderName 决定
+# ~/<name>/{data,extensions}（wslServer.sh 的 DATAFOLDER 参数只用于 bin/ 与
+# server-env-setup，不会传给 server）。归档的 product.json 仍是微软的
+# .vscode-server / code-server，不改就会与用户已装的 VS Code WSL server 共用
+# data、logs、User/globalStorage 与 extensions。
+NODE="$DEST_SERVER/node"
+PRODUCT="$DEST_SERVER/product.json"
+if [ -x "$NODE" ] && [ -f "$PRODUCT" ]; then
+  "$NODE" -e '
+    const fs = require("fs");
+    const [file, ...pairs] = process.argv.slice(1);
+    const p = JSON.parse(fs.readFileSync(file, "utf8"));
+    for (const pair of pairs) {
+      const eq = pair.indexOf("=");
+      p[pair.slice(0, eq)] = JSON.parse(pair.slice(eq + 1));
+    }
+    fs.writeFileSync(file, JSON.stringify(p, null, 2) + "\n");
+  ' "$PRODUCT" \
+    'nameShort="Picket Code"' \
+    'nameLong="Picket Code"' \
+    'applicationName="picket-code"' \
+    'dataFolderName=".picket-code"' \
+    "serverDataFolderName=\"$FOLDER\"" \
+    "serverApplicationName=\"$SERVER_APPNAME\"" \
+    'extensionsGallery={"serviceUrl":"https://open-vsx.org/vscode/gallery","itemUrl":"https://open-vsx.org/vscode/item"}' \
+    'updateUrl=null' \
+    && info "修正 product.json: serverDataFolderName=$FOLDER, serverApplicationName=$SERVER_APPNAME"
+fi
+
+# 服务端按是否存在 ../node_modules/vsda 决定要不要强制校验客户端签名
+# （server-main.js: existsSync(.../node_modules/vsda) ? require('vsda') : null，
+#   握手处 if (!l) E = !0 即"无 vsda 则放行未签名客户端"）。
+# 我们的客户端用桩 vsda 签不出真签名，所以要移除服务端这份，否则连接被
+# "Unauthorized client refused" 拒绝。
+if [ -d "$DEST_SERVER/node_modules/vsda" ]; then
+  mv "$DEST_SERVER/node_modules/vsda" "$DEST_SERVER/node_modules/vsda.disabled"
+  info "已禁用服务端 vsda（无签名降级，见文档第八节）"
 fi
 
 # ---- 结果 ----

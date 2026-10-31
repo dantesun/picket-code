@@ -173,3 +173,5 @@ npx -y rea-agents@6.8.0 analyze-javascript-application /tmp/rea-wsl/ext/extensio
 ## 九、手工安装与预置
 
 `.vsix` 离线安装、以及把 CLI + Server 预置进发行版以绕开下载的完整流程，见 `docs/manual-remote-wsl.md`（脚本：`build/manual-wsl-server.sh`）。
+
+该文档第九节记了许可边界：这两步在**个人开发机上自用**属于超出微软许可授权范围但无分发的灰色地带；**随发行版分发或提供镜像下载是明确禁止的**。要产品化，只能换成 MIT 的客户端实现 + 自建 reh server（即第六节的 ①②③）。

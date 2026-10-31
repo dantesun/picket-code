@@ -156,15 +156,86 @@ Windows 侧打开/重载 WSL 窗口，WSL 输出面板（`remote.WSL.logLevel` �
 ## 八、已知限制
 
 - **两套布局并存**：扩展上层走 `bin-cli/<commit>`（`spawnCli`），daemon 侧还认 `bin/<commit>`。两者都放上最稳；只放 `bin-cli` 时如果日志显示还在下载，说明走到了 daemon 路径。
-- **`serverApplicationName` 不一致**：发行版是 `picket-code-server`，而微软 server 归档的 `bin/` 里是 `code-server`、`helpers`、`remote-cli`。1.104.7 的 `extension.js` 里 `serverApplicationName` 出现 0 次，CLI 路径不读它；若日志显示走到了 daemon 路径（按 `bin/<commit>/bin/<serverApplicationName>` 启动），补一个链接即可：
+- **`serverApplicationName` 不一致**：发行版是 `picket-code-server`，而微软 server 归档的 `bin/` 里只有 `code-server`、`helpers`、`remote-cli`。`scripts/wslServer.sh` 最后一行是 `"$VSCODE_REMOTE_BIN/$COMMIT/bin/$SERVER_APPNAME" "$@"`，第三个参数正是 product.json 的 `serverApplicationName`，不补会以 `not found` 退出。补个软链接即可：
   ```bash
-  ln -s code-server ~/.picket-code-server/bin/<commit>/bin/picket-code-server
+  cd ~/.picket-code-server/bin/<commit>/bin && ln -s code-server picket-code-server
+  ./picket-code-server --version        # 应打印 1.143.1
   ```
-- **CLI 自己的数据目录**：`code-cli` 默认用 `~/.vscode-server`（二进制里有 `--server-data-dir=` 可改），和 `serverDataFolderName` 不是同一个。如果它坚持自己下载 server，按同一套路径把它那份也预置好。
+- **必须改归档里的 product.json，否则与 VS Code 共用数据与扩展**：数据目录由 server 自己的 product.json 决定（`serverDataFolderName` → `~/<name>/{data,extensions}`），`wslServer.sh` 的第 4 个参数只用于 `bin/` 与 `server-env-setup`，**不会**传给 server；`code-cli` 也不传（它只在自己收到 `--server-data-dir` 时才转发）。归档里这些字段仍是微软的 `.vscode-server`/`code-server`，实测会写进 `~/.vscode-server/data/logs/<时间戳>/` 并加载那里的扩展。`build/manual-wsl-server.sh` 会用载荷自带的 `node` 改写 `product.json`：
+  ```bash
+  NODE=~/.picket-code-server/bin/<commit>/node
+  PRODUCT=~/.picket-code-server/bin/<commit>/product.json
+  "$NODE" -e '
+    const fs = require("fs"); const [f, ...pairs] = process.argv.slice(1);
+    const p = JSON.parse(fs.readFileSync(f, "utf8"));
+    for (const s of pairs) { const i = s.indexOf("="); p[s.slice(0,i)] = JSON.parse(s.slice(i+1)); }
+    fs.writeFileSync(f, JSON.stringify(p, null, 2) + "\n");
+  ' "$PRODUCT" \
+    'nameShort="Picket Code"' 'nameLong="Picket Code"' 'applicationName="picket-code"' \
+    'dataFolderName=".picket-code"' 'serverDataFolderName=".picket-code-server"' \
+    'serverApplicationName="picket-code-server"' \
+    'extensionsGallery={"serviceUrl":"https://open-vsx.org/vscode/gallery","itemUrl":"https://open-vsx.org/vscode/item"}' \
+    'updateUrl=null'
+  ```
+  改完在不同 HOME 下起一次，确认生成的是 `~/.picket-code-server/{data,extensions}`。副作用是**首次连接扩展列表为空**（完全隔离），要沿用 VS Code 那批扩展就自己复制过去或重装。
 - **不要把 `updateUrl` 随便指向微软**：它同时是自更新入口，指向 `https://update.code.visualstudio.com` 会让应用去拉正版 VS Code 覆盖自己。真要设就同时配 `"update.mode": "none"`。
-- **许可证**：Remote-WSL 按微软产品条款分发，本次只做手工预置与互操作，勿把其代码/脚本复制进发行版。
+- **服务端必须关掉 vsda 才能连上**：握手最后一步（`ConnectionTypeRequest`）要求客户端提交 vsda 签名，而 `server-main.js` 里是 `let l = this._vsdaMod ? new this._vsdaMod.validator : null;` … `if (!l) E = !0;`——**只有服务端没有 vsda 校验器时才放行未签名客户端**。本发行版客户端用桩 vsda（见 9.3），签不出真签名，所以必须把服务端载荷里的 `node_modules/vsda` 移开（`manual-wsl-server.sh` 已自动重命名为 `vsda.disabled`）。否则表现为：WebSocket 建连成功、走到 `5/6. sending ConnectionTypeRequest` 后报 `Connection error: Unauthorized client refused`。
+- **许可证**：Remote-WSL 与微软 server 都受微软自己的许可约束，能不能做取决于场景——**个人自用可以但属违约、随发行版分发明确禁止**，详见第九节。
 
-## 九、参考
+## 九、许可边界与个人使用的正确做法
+
+> 本页流程能不能做，取决于**谁做、在哪台机器上做、做完给不给别人**。条款原文来自 VSIX 里的 `LICENSE.txt`（微软 *Visual Studio Code Remote Development Extensions* 许可）和 server 包里的 `LICENSE`（同一份许可的 pre-release 版本）。
+
+### 9.1 结论速览
+
+| 场景 | 合规性 | 依据 |
+|---|---|---|
+| 自己开发机上装微软官方 VS Code，从画廊装 Remote-WSL | ✅ 条款允许 | §1.a |
+| 自己开发机上给 Picket Code 侧载 Remote-WSL 自用 | ⚠️ 超出授权范围（违约），无分发，实务风险低 | §1.a「with each validly licensed copy of **Microsoft Visual Studio Code**」 |
+| 在上一条基础上手工预置微软 server 二进制 | ⚠️ 同上，server 是同一套条款的 pre-release 版 | server `LICENSE` §1.a、§7 |
+| 组织内分发给同事 | ⚠️ 允许在"你的开发设备"上用，但每人须持 VS Code 许可，且仍限微软 VS Code | §1.a 第 2 句 |
+| 打进发行版 / 提供镜像下载 / 做一键安装器 | ❌ 明确禁止 | §6「host, share, publish, rent or lease the software … or provide the software … for others to use」 |
+| 内置 `vsda` 桩或默认 `VSCODE_DEV=1` 绕过"仅微软版"检查 | ❌ 明确禁止 | §6「work around any technical limitations in the software」 |
+
+### 9.2 为什么"我装了 VS Code"也不构成授权
+
+§1.a 的措辞是把**使用场景**绑在微软 VS Code 上——"与每一份合法授权的 *Microsoft Visual Studio Code* 副本一起使用"，而不是"你个人拥有许可"这一事实。Picket Code 是独立发行版（商标、`product.json`、`commit` 都不同），扩展被它加载的那一刻就已经在授权范围之外。这也正是扩展用 `vsda` 在激活时做技术判定的原因：技术限制本身就是条款 §6 要求用户遵守的对象。
+
+### 9.3 个人自用的正确做法
+
+1. **只在自己的开发机上做**，不要把它变成发行版能力，也不要替别人预置。
+2. **产物不落地到任何公共位置**：`ms-vscode-remote.remote-wsl-*.vsix`、`server-*.tar.gz`、`cli-*.tar.gz` 都不要进仓库、Release、R2 或网盘。仓库里只放脚本，不放二进制。
+3. **清楚两条绕过手段的实际状态**（都属 §6 的 "work around technical limitations"，仅限本机，不进发行版）：
+   - `VSCODE_DEV=1`：**在本项目的压缩构建上不可用**。`mainImpl.js` 里 NLS 消息表的装载是 `if (!(process.env.VSCODE_DEV || !n)) { globalThis._VSCODE_NLS_MESSAGES = … }`，一旦设了该变量就不再加载消息表，而 `--min` 构建的 `localize()` 已被编译成数字索引，启动时立刻抛 `!!! NLS MISSING: 138 !!!`。dev 模式要求非压缩构建（松散的 `out/vs/**` 模块），与发行包不兼容。
+   - `vsda` 桩：在 `resources/app/node_modules/vsda/` 放一个导出 `{ signer, validator }` 的包，即可让探测通过。导出值故意不是构造函数，core 的 `sign()` / `validate()` 会落进既有的 `try{…}catch{}`，退化为"不签名"——与当前缺少 vsda 时的行为一致。它改的是应用目录，换包即失效，不会跟着发行版走。
+4. **用完可整体清掉**：
+
+   ```bash
+   rm -rf ~/.picket-code-server            # 发行版内的 CLI + server
+   ```
+
+   ```powershell
+   & "<Picket Code>\Picket Code.exe" --uninstall-extension ms-vscode-remote.remote-wsl
+   ```
+
+如果目的只是"在 Windows 上编辑 WSL 里的工程"，其实**不需要** Remote-WSL：直接打开 `\\wsl.localhost\Ubuntu\home\<user>\...`，或在 WSL 内启动 `picket-code .` 走 WSLg 显示；代价是文件监听、端口转发要自己处理（分析文档第七节有两条相关结论）。
+
+### 9.4 想产品化：走完整 MIT 链路
+
+| 层 | 本页做法（不可分发） | 合规做法 |
+|---|---|---|
+| 客户端扩展 | 侧载微软 Remote-WSL | MIT 第三方实现（如 `jeanp413/open-remote-wsl`）或自写 |
+| 服务端 | 从微软 CDN 取 `server-linux-x64` | 用上游 MIT 源码自行构建 reh server（`build/gulpfile.reh.ts`） |
+| 分发 | 指向 `update.code.visualstudio.com` | 自建（R2）**只托管自己构建的产物** |
+| 命名 | "Remote - WSL" / "VS Code Server" | 自有命名，避开微软商标 |
+
+只走第一步（换客户端）不够：服务端仍是微软的受许可二进制，仍受 §7 的 host/share/publish 限制。
+
+### 9.5 免责
+
+以上是对条款字面的解读，不构成法律意见。个人使用风险自担；商业分发前请让法务过一遍。
+
+## 十、参考
 
 - 实现分析：`docs/remote-wsl-extension-analysis.md`
 - 脚本：`build/manual-wsl-server.sh`
