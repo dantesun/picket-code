@@ -17,18 +17,20 @@ Picket Code 是 [Code - OSS](https://github.com/microsoft/vscode) 的发行版�
 
 MVP 范围（当前发行）：**Linux (x64)** 与 **Windows (x64)**——`tar.gz` 与 `zip` 压缩包。macOS 与 ARM64 在 P0 验证闭环后规划；见 `docs/roadmap.md`。
 
+Windows 上还可在 WSL2 发行版里做远程开发：需自行侧载微软 Remote-WSL 并手工预置服务端载荷，**仅限个人自用**，步骤与许可边界见 [docs/manual-remote-wsl.md](docs/manual-remote-wsl.md)。
+
 ## 快速开始
 
-当前发行版 **v1.143.1-p4**（上游 VS Code `1.143.1`）。发行包文件名带版本号，推荐从镜像站下载（国内访问更快）：
+当前发行版 **v1.143.1**（上游 VS Code `1.143.1`）。发行包文件名带版本号，推荐从镜像站下载（国内访问更快）：
 
 | 平台 | 下载地址 |
 |---|---|
-| Windows (x64) | `https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip` |
-| Linux (x64) | `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz` |
-| 校验和 | `https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS` |
+| Windows (x64) | `https://download.noware.cn/picket-code-v1.143.1-win32-x64.zip` |
+| Linux (x64) | `https://download.noware.cn/picket-code-v1.143.1-linux-x64.tar.gz` |
+| 校验和 | `https://download.noware.cn/picket-code-v1.143.1-SHA256SUMS` |
 
 ```bash
-curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

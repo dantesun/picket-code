@@ -21,7 +21,7 @@ const VERSION_REGEXP = /^(\^|>=)?((\d+)|x)\.((\d+)|x)\.((\d+)|x)(\-.*)?$/;
 |---|---|---|
 | `1.143.1` | 成功 | 正常 |
 | `1.143.1+p4` | 返回 null | `isValidVersion()` 恒 false → **所有带 `main` 的扩展**都报 `not compatible with Code 1.143.1+p4` |
-| `1.143.1-p4` | 成功 | VS Code 侧能过，但它在 semver 里是 prerelease，画廊侧 `semver.satisfies()` 匹配 `^1.x` 会失败 |
+| `1.143.1` | 成功 | VS Code 侧能过，但它在 semver 里是 prerelease，画廊侧 `semver.satisfies()` 匹配 `^1.x` 会失败 |
 
 所以 `build/build.sh` 已去掉版本戳，打包产物保持上游原值。构建后自检：
 

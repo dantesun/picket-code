@@ -39,19 +39,26 @@ versions ──► compile(linux) ──┐
 
 ## 触发方式
 
-- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1-p4`（上游 `1.143.1`）。同一上游版本的自有重建在同一标签后追加 `-pN`，例：`v1.143.1` → `v1.143.1-p1` → `v1.143.1-p2` → `v1.143.1-p3` → `v1.143.1-p4`；工作流会剥掉 `-pN` 后定位上游 tag。
+- **推送 `v*` 标签**：标签以上游 VS Code 版本命名，当前为 `v1.143.1`（上游 `1.143.1`）。同一上游版本重建时**移动标签**：删掉旧 Release（`gh release delete <tag> --yes --cleanup-tag`），把同名 tag 重新指向新提交后 `git push origin <tag> --force`，不复用 `-pN` 后缀；工作流对历史遗留的 `-pN` 标签仍会剥掉后缀再定位上游 tag。
 - **手动触发**：`workflow_dispatch`，可指定上游版本与是否预发布。
 
-> 历史：`v1.143.1`（2026-10-27）ASAR 含 748 个重叠条目，会崩溃扩展宿主；`v1.143.1-p1` / `v1.143.1-p2` 因 `product.json` 两个字段被写成 `null` / `{}`，扩展扫描器构造即抛错，装上后不加载任何扩展（连 `--list-extensions` 都失败）。前三个版本均已从 GitHub 与镜像删除。`v1.143.1-p3` 修好了扩展加载，当前发行版为 `v1.143.1-p4`。
+> 历史：早期用 `-pN` 区分同一上游版本的重建（`v1.143.1-p1` … `v1.143.1-p4`）。`p1`/`p2` 因 `product.json` 两个字段被写成 `null` / `{}`，扩展扫描器构造即抛错、装后不加载任何扩展；`p3`/`p4` 修好了扩展加载但仍按旧策略命名。2026-10-31 起改为单一标签：`v1.143.1` 指向当前发行（含提案 API 白名单与 WSL 服务端打包脚本），`-p1`…`-p4` 的 Release 与 tag 已全部删除。
 
-## 当前版本 v1.143.1-p4
+## 当前版本 v1.143.1
+
+本次重建（2026-10-31）在上一次基础上追加：
+
+- **提案 API**：`product.json` 新增 `extensionEnabledApiProposals`，为 `ms-vscode-remote.remote-wsl` 放行 `resolvers`、`contribRemoteHelp`、`contribViewsRemote`、`telemetry`。此前该扩展激活即失败（`CANNOT use API proposal: resolvers`）——没有白名单时核心会把扩展声明的提案整段剥离。
+- **WSL 服务端打包**：`build/manual-wsl-server.sh` 用载荷自带的 `node` 改写服务端 `product.json`，把数据与扩展目录隔离到 `~/.picket-code-server`（原先会写进 `~/.vscode-server`，与已装的 VS Code 共用 logs、globalStorage 与扩展）；同时补 `bin/picket-code-server` 入口、移开载荷里的 `vsda`。细节与许可边界见 `docs/manual-remote-wsl.md`。
+
+上一版的改动仍然有效：
 
 - **语音**：启动不再为云听写向 GitHub 认证要会话（此前每次启动等满 10 秒并打一条 WARN）；Voice Mode 整块不再加载（`agentsVoice.*` 命令、会话选择器、转录视图、onboarding、原生命令，约 7400 行），云听写入口随之消失；**本地离线听写保留**（`foundry-local-sdk`，无需登录、无需权益）。
 - **欢迎页**：启动时不再自动打开（`workbench.startupEditor` 默认 `none`）；agents banner 不再拿到账户服务，因此不可能再出现无法完成的 "Sign in to GitHub"；移除两张 "Get started with VS Code" 走查卡片，无障碍走查保留（帮助菜单按 id 打开它），标题改为 Picket Code。
 - **agent host**：不再为 Electron 主进程那条连接注册 BYOK 反向桥——那条连接从来没有这个通道，此前每次启动会打 `Unknown channel: agentHostClientByokLm`。
 - **验证**：`verify-release` 新增三条运行时断言（日志中不得出现 `[chat-stt]`、`Unknown channel: agentHostClientByokLm`、`walkThrough://vscode_getting_started_page`），linux 与 win32 均通过；`--list-extensions` 退出 0，`vscode.git` 等 5 个内置扩展完成激活。
 
-### 历史版本 v1.143.1-p3
+### 更早的修复（`-p3` 及之前）
 
 - `builtInExtensionsEnabledWithAutoUpdates` 恢复为上游类型（空数组），`tunnelApplicationConfig` 整个键移除 → 扩展扫描器不再崩，用户扩展与内置扩展都可加载；
 - `apply-patches.sh` 新增形状守卫（`build/check-product-shapes.py`）：覆盖项类型不符、删除上游数组/对象键未登记守卫、新增上游不存在的空容器，都会让构建失败；
@@ -61,7 +68,7 @@ versions ──► compile(linux) ──┐
 ## 版本策略
 
 - 每次发布钉一个上游 tag（如 1.143.1），补丁按钉版应用；
-- 同一上游版本的多次重建不升级钉版，只递增 `-pN`；
+- 同一上游版本的多次重建不升级钉版，直接移动同名标签（不复用 `-pN` 后缀）；
 - 升级流程：更新钉版 → 逐补丁检查锚点 → 全量构建 → 冒烟；
 - 长期维护成本：53 号补丁跨 30 个文件（28 修改 + 2 删除），上游每次重构都会引发 rebase（与 VSCodium 同处境，接受）。
 
@@ -78,14 +85,14 @@ versions ──► compile(linux) ──┐
 
 ## 镜像
 
-Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 R2 自定义域名 `https://download.noware.cn` 提供（文档站仍在 `https://picket-code.noware.cn`）。该主机名是 R2 桶的自定义域名，对象由 R2 直接返回（`cf-cache-status: DYNAMIC`，即不经 Cloudflare 边缘缓存），因此每次下载都会读取 R2。示例（tag `v1.143.1-p4`）：
+Release 资产会 `rclone copy` 到 Cloudflare R2 桶 `picket-releases`，对外通过 R2 自定义域名 `https://download.noware.cn` 提供（文档站仍在 `https://picket-code.noware.cn`）。该主机名是 R2 桶的自定义域名，对象由 R2 直接返回（`cf-cache-status: DYNAMIC`，即不经 Cloudflare 边缘缓存），因此每次下载都会读取 R2。示例（tag `v1.143.1`）：
 
-- `https://download.noware.cn/picket-code-v1.143.1-p4-win32-x64.zip`
-- `https://download.noware.cn/picket-code-v1.143.1-p4-linux-x64.tar.gz`
-- `https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS`
+- `https://download.noware.cn/picket-code-v1.143.1-win32-x64.zip`
+- `https://download.noware.cn/picket-code-v1.143.1-linux-x64.tar.gz`
+- `https://download.noware.cn/picket-code-v1.143.1-SHA256SUMS`
 
 ```bash
-curl -fSL https://download.noware.cn/picket-code-v1.143.1-p4-SHA256SUMS -o SHA256SUMS
+curl -fSL https://download.noware.cn/picket-code-v1.143.1-SHA256SUMS -o SHA256SUMS
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 

@@ -40,5 +40,5 @@ npm run docs:preview    # 本地预览构建产物
 
 ## 更新站点内容
 
-- 发新版时更新 `docs/guide/download.md` 中的版本号（当前 `v1.143.1-p3`）；
+- 发新版时更新 `docs/guide/download.md` 中的版本号（当前 `v1.143.1`）；
 - 文档内容以仓库 `README.md` 与 `docs/` 为唯一事实来源，站点页面保持同步。
